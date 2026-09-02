@@ -1,0 +1,380 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Locations (single seeded row for now; every business-scoped
+// table below carries a locationId so a second branch can be
+// added later without restructuring queries).
+// ─────────────────────────────────────────────────────────────
+
+model Location {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stations       Station[]
+  products       Product[]
+  orders         Order[]
+  customers      Customer[]
+  discounts      Discount[]
+  expenses       Expense[]
+  staff          Staff[]
+
+  @@map("locations")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Staff / Auth
+// ─────────────────────────────────────────────────────────────
+
+enum StaffRole {
+  ADMIN
+  CASHIER
+}
+
+model Staff {
+  id           String    @id @default(uuid())
+  locationId   String
+  location     Location  @relation(fields: [locationId], references: [id])
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         StaffRole @default(CASHIER)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  ordersAsWaiter Order[]   @relation("OrderWaiter")
+  ordersCreated  Order[]   @relation("OrderCreatedBy")
+  sessions       Session[] @relation("SessionStartedBy")
+  expenses       Expense[]
+
+  @@index([locationId])
+  @@map("staff")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Stations & Sessions
+// ─────────────────────────────────────────────────────────────
+
+enum StationType {
+  PLAYSTATION
+  TABLE_GAME
+  SKATING
+  OTHER
+}
+
+enum StationStatus {
+  FREE
+  ACTIVE
+  PAUSED
+  EXPIRING_SOON
+  MAINTENANCE
+}
+
+model Station {
+  id         String        @id @default(uuid())
+  locationId String
+  location   Location      @relation(fields: [locationId], references: [id])
+  name       String
+  type       StationType
+  status     StationStatus @default(FREE)
+  sortOrder  Int           @default(0)
+  active     Boolean       @default(true)
+  // When true, this station can host more than one concurrent session (e.g.
+  // a skating rink shared by several customers, each on their own clock)
+  // instead of the default one-session-at-a-time rule.
+  allowMultipleSessions Boolean @default(false)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  sessions Session[]
+
+  @@index([locationId])
+  @@map("stations")
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+model Session {
+  id     String @id @default(uuid())
+  stationId String
+  station   Station @relation(fields: [stationId], references: [id])
+
+  playerName    String?
+  packageLabel  String        // e.g. "1 Hour", "30 Minutes", "Open"
+  ratePerHour   Decimal       @db.Decimal(10, 2)
+  status        SessionStatus @default(ACTIVE)
+
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  plannedEndAt   DateTime?    // startedAt + package duration + extensions, minus paused time
+  durationMin    Int?         // package duration in minutes, null = open-ended
+  pausedAt       DateTime?    // set while status = PAUSED
+  totalPausedMs  BigInt       @default(0)
+  extensionsMin  Int          @default(0)
+
+  finalAmount    Decimal?      @db.Decimal(10, 2)
+
+  startedById String?
+  startedBy   Staff?  @relation("SessionStartedBy", fields: [startedById], references: [id])
+
+  transferredFromId String?    @unique
+  transferredFrom    Session?  @relation("SessionTransfer", fields: [transferredFromId], references: [id])
+  transferredTo       Session? @relation("SessionTransfer")
+
+  orderItemId String?    @unique
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stationId])
+  @@index([status])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Products / Categories
+// ─────────────────────────────────────────────────────────────
+
+enum ProductCategory {
+  PLAYSTATION
+  TABLE_GAMES
+  SKATING
+  COFFEE
+  CAFETERIA
+}
+
+enum ProductType {
+  ITEM       // flat-priced retail/cafeteria item
+  TIME_PACKAGE // starts a live session when added to cart
+}
+
+model Product {
+  id          String          @id @default(uuid())
+  locationId  String
+  location    Location        @relation(fields: [locationId], references: [id])
+  name        String
+  category    ProductCategory
+  type        ProductType     @default(ITEM)
+  price       Decimal         @db.Decimal(10, 2)
+  imageUrl    String?
+  inStock     Boolean         @default(true)
+  active      Boolean         @default(true)
+
+  // only relevant when type = ITEM (retail/cafeteria goods); null for
+  // TIME_PACKAGE, which has no countable unit stock. When set, inStock is
+  // derived from stockQty > 0 rather than toggled manually.
+  stockQty Int?
+
+  // only relevant when type = TIME_PACKAGE
+  durationMin      Int?
+  stationTypeLink  StationType?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([locationId])
+  @@index([category])
+  @@map("products")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Orders
+// ─────────────────────────────────────────────────────────────
+
+enum OrderType {
+  DINE
+  WALK
+  DELIVERY
+}
+
+enum OrderStatus {
+  OPEN
+  HELD
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE
+  CREDIT
+}
+
+model Order {
+  id         String      @id @default(uuid())
+  locationId String
+  location   Location    @relation(fields: [locationId], references: [id])
+
+  orderNumber Int         @default(autoincrement())
+  type        OrderType   @default(WALK)
+  status      OrderStatus @default(OPEN)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  waiterId String?
+  waiter   Staff?  @relation("OrderWaiter", fields: [waiterId], references: [id])
+
+  createdById String?
+  createdBy   Staff?  @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
+  discountId String?
+  discount   Discount? @relation(fields: [discountId], references: [id])
+
+  subtotal   Decimal @db.Decimal(10, 2) @default(0)
+  taxAmount  Decimal @db.Decimal(10, 2) @default(0)
+  discountAmount Decimal @db.Decimal(10, 2) @default(0)
+  total      Decimal @db.Decimal(10, 2) @default(0)
+
+  paymentMethod PaymentMethod?
+  paidAt        DateTime?
+
+  heldAt      DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([locationId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity   Int     @default(1)
+  unitPrice  Decimal @db.Decimal(10, 2)
+  lineTotal  Decimal @db.Decimal(10, 2)
+
+  session Session?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  method PaymentMethod
+  amount Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Customers
+// ─────────────────────────────────────────────────────────────
+
+model Customer {
+  id         String   @id @default(uuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  name    String
+  phone   String?
+  email   String?
+  balance Decimal @db.Decimal(10, 2) @default(0) // credit/balance owed
+  visitCount Int  @default(0)
+  notes   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([locationId])
+  @@map("customers")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Discounts
+// ─────────────────────────────────────────────────────────────
+
+enum DiscountType {
+  PERCENT
+  FLAT
+}
+
+model Discount {
+  id         String       @id @default(uuid())
+  locationId String
+  location   Location     @relation(fields: [locationId], references: [id])
+
+  name       String
+  type       DiscountType
+  value      Decimal      @db.Decimal(10, 2)
+  active     Boolean      @default(true)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  productId  String?      // optional: restrict to one product
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([locationId])
+  @@map("discounts")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Expenses
+// ─────────────────────────────────────────────────────────────
+
+model Expense {
+  id         String   @id @default(uuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  category String
+  amount   Decimal @db.Decimal(10, 2)
+  note     String?
+  date     DateTime @default(now())
+
+  createdById String?
+  createdBy   Staff?  @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([locationId])
+  @@index([date])
+  @@map("expenses")
+}

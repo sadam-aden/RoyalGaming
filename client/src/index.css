@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #0b1220;
+  --color-surface: #111a2e;
+  --color-surface-alt: #16213b;
+  --color-border: #223154;
+  --color-border-soft: #1b2946;
+
+  --color-text: #e6ebf5;
+  --color-text-muted: #8b96b3;
+  --color-text-faint: #5c6789;
+
+  --color-accent: #0ea5e9;
+  --color-accent-dark: #0284c7;
+  --color-accent-soft: #0c2233;
+
+  --color-danger: #ef4444;
+  --color-danger-soft: #2c1418;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #2c2211;
+  --color-info: #3b82f6;
+  --color-info-soft: #10233f;
+}
+
+:root {
+  /* This app is dark-only, so tell the browser to render native form
+     controls (date picker icon, checkboxes, etc.) with the OS/browser's
+     dark-mode colors instead of the default black-on-transparent icons
+     that disappear against a dark background. */
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 9999px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .receipt-print-area,
+  .receipt-print-area * {
+    visibility: visible;
+  }
+  .receipt-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 80mm;
+    color: #000;
+    background: #fff;
+  }
+}
