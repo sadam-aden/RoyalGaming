@@ -10,3 +10,4 @@ server/node_modules/
 server/dist/
 client/dist/
 server/uploads/
+HOSTING.html

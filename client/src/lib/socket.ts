@@ -4,6 +4,8 @@ import { API_BASE_URL } from "./config";
 export const socket = io(API_BASE_URL || undefined, {
   autoConnect: true,
   transports: ["websocket", "polling"],
+  // Skips ngrok's browser-warning interstitial on the polling fallback.
+  extraHeaders: { "ngrok-skip-browser-warning": "true" },
 });
 
 export const SOCKET_EVENTS = {

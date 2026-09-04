@@ -3,9 +3,11 @@ import { clsx } from "clsx";
 import type { Product } from "../../types";
 import { formatCurrency } from "../../lib/format";
 import { resolveAssetUrl } from "../../lib/config";
+import { RemoteImage } from "../ui/RemoteImage";
 
 export function ProductCard({ product, onSelect }: { product: Product; onSelect: (product: Product) => void }) {
   const disabled = !product.inStock;
+  const imageUrl = resolveAssetUrl(product.imageUrl);
 
   return (
     <button
@@ -17,8 +19,8 @@ export function ProductCard({ product, onSelect }: { product: Product; onSelect:
       )}
     >
       <div className="flex h-24 items-center justify-center bg-surface-alt text-text-faint">
-        {product.imageUrl ? (
-          <img src={resolveAssetUrl(product.imageUrl) ?? undefined} alt={product.name} className="h-full w-full object-cover" />
+        {imageUrl ? (
+          <RemoteImage src={imageUrl} alt={product.name} className="h-full w-full object-cover" />
         ) : product.type === "TIME_PACKAGE" ? (
           <Clock size={26} />
         ) : (

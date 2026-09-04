@@ -8,6 +8,7 @@ import { productsAdminApi, type ProductPayload } from "../../lib/productsAdminAp
 import { apiErrorMessage } from "../../lib/api";
 import { formatCurrency } from "../../lib/format";
 import { resolveAssetUrl } from "../../lib/config";
+import { RemoteImage } from "../../components/ui/RemoteImage";
 import type { Product, ProductCategory, ProductType, StationType } from "../../types";
 
 const CATEGORIES: ProductCategory[] = ["PLAYSTATION", "TABLE_GAMES", "SKATING", "COFFEE", "CAFETERIA"];
@@ -113,7 +114,7 @@ export function ProductsAdminPage() {
                           className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-surface-alt text-text-faint hover:text-accent"
                           title="Upload image"
                         >
-                          {p.imageUrl ? <img src={resolveAssetUrl(p.imageUrl) ?? undefined} alt={p.name} className="h-full w-full object-cover" /> : <ImagePlus size={16} />}
+                          {p.imageUrl ? <RemoteImage src={resolveAssetUrl(p.imageUrl)!} alt={p.name} className="h-full w-full object-cover" /> : <ImagePlus size={16} />}
                         </button>
                         <input
                           ref={(el) => {
