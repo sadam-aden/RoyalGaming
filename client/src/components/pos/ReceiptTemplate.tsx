@@ -11,13 +11,13 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 export function ReceiptTemplate({ order }: { order: Order }) {
   return (
-    <div className="receipt-print-area font-mono text-[13px] leading-relaxed text-black">
+    <div className="receipt-print-area font-mono text-[12px] font-bold leading-tight text-black">
       <div className="text-center">
-        <div className="text-base font-bold">Royal Gaming &amp; Cafeteria</div>
-        <div className="text-xs">POS + Session Management</div>
+        <div className="text-sm font-bold">Royal Gaming &amp; Cafeteria</div>
+        <div className="text-[10px] font-normal">POS + Session Management</div>
       </div>
 
-      <div className="my-3 border-t border-dashed border-black/40" />
+      <div className="my-1.5 border-t border-dashed border-black/40" />
 
       <div className="flex justify-between">
         <span>Order #{order.orderNumber}</span>
@@ -46,9 +46,9 @@ export function ReceiptTemplate({ order }: { order: Order }) {
         </div>
       )}
 
-      <div className="my-3 border-t border-dashed border-black/40" />
+      <div className="my-1.5 border-t border-dashed border-black/40" />
 
-      <div className="flex justify-between font-bold">
+      <div className="flex justify-between">
         <span className="w-1/2">Item</span>
         <span className="w-1/4 text-center">Qty</span>
         <span className="w-1/4 text-right">Amount</span>
@@ -61,7 +61,7 @@ export function ReceiptTemplate({ order }: { order: Order }) {
         </div>
       ))}
 
-      <div className="my-3 border-t border-dashed border-black/40" />
+      <div className="my-1.5 border-t border-dashed border-black/40" />
 
       <div className="flex justify-between">
         <span>Subtotal</span>
@@ -79,19 +79,19 @@ export function ReceiptTemplate({ order }: { order: Order }) {
           <span>{formatCurrency(order.taxAmount)}</span>
         </div>
       )}
-      <div className="flex justify-between text-base font-bold">
+      <div className="flex justify-between text-sm">
         <span>Total</span>
         <span>{formatCurrency(order.total)}</span>
       </div>
 
-      <div className="my-3 border-t border-dashed border-black/40" />
+      <div className="my-1.5 border-t border-dashed border-black/40" />
 
       <div className="flex justify-between">
         <span>Paid via</span>
         <span>{order.paymentMethod ? PAYMENT_LABELS[order.paymentMethod] : "—"}</span>
       </div>
 
-      <div className="mt-4 text-center text-xs">Thank you for visiting!</div>
+      <div className="mt-2 text-center text-[10px] font-normal">Thank you for visiting!</div>
     </div>
   );
 }
