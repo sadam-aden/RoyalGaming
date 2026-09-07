@@ -61,8 +61,10 @@ export function ProductsAdminPage() {
     const trimmed = nameDraft.trim();
     setEditingNameId(null);
     if (!trimmed) return;
-    await productsAdminApi.update(id, { name: trimmed });
-    refresh();
+    const updated = await productsAdminApi.update(id, { name: trimmed });
+    // Update in place rather than refetching — the list is sorted alphabetically,
+    // so a full refresh would immediately move the renamed row out from under the admin.
+    setProducts((prev) => prev.map((p) => (p.id === id ? updated.data : p)));
   }
 
   function startEditPrice(p: Product) {
