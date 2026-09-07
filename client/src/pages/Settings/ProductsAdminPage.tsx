@@ -1,4 +1,4 @@
-import { ImagePlus, Plus, Trash2 } from "lucide-react";
+import { ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Topbar } from "../../components/layout/Topbar";
 import { Card } from "../../components/ui/Card";
@@ -19,6 +19,8 @@ export function ProductsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState("");
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
@@ -47,6 +49,19 @@ export function ProductsAdminPage() {
 
   async function handleImageUpload(id: string, file: File) {
     await productsAdminApi.uploadImage(id, file);
+    refresh();
+  }
+
+  function startEditName(p: Product) {
+    setEditingNameId(p.id);
+    setNameDraft(p.name);
+  }
+
+  async function commitName(id: string) {
+    const trimmed = nameDraft.trim();
+    setEditingNameId(null);
+    if (!trimmed) return;
+    await productsAdminApi.update(id, { name: trimmed });
     refresh();
   }
 
@@ -130,7 +145,33 @@ export function ProductsAdminPage() {
                           }}
                         />
                       </td>
-                      <td className="py-3 pr-4 font-medium">{p.name}</td>
+                      <td className="py-3 pr-4 font-medium">
+                        {editingNameId === p.id ? (
+                          <input
+                            type="text"
+                            autoFocus
+                            value={nameDraft}
+                            onChange={(e) => setNameDraft(e.target.value)}
+                            onBlur={() => commitName(p.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitName(p.id);
+                              if (e.key === "Escape") setEditingNameId(null);
+                            }}
+                            className="w-40 rounded-lg border border-accent bg-surface-alt px-2 py-1 text-sm text-text outline-none"
+                          />
+                        ) : (
+                          <div className="group flex items-center gap-1.5">
+                            <span>{p.name}</span>
+                            <button
+                              onClick={() => startEditName(p)}
+                              className="text-text-faint opacity-0 hover:text-accent group-hover:opacity-100"
+                              title="Edit name"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
                       <td className="py-3 pr-4 text-text-muted">{p.category.replace("_", " ")}</td>
                       <td className="py-3 pr-4 text-text-muted">
                         {editingPriceId === p.id ? (
