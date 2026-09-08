@@ -13,8 +13,8 @@ export function ReceiptTemplate({ order }: { order: Order }) {
   return (
     <div className="receipt-print-area font-mono text-[12px] font-bold leading-tight text-black">
       <div className="text-center">
-        <div className="text-sm font-bold">Royal Gaming &amp; Cafeteria</div>
-        <div className="text-[10px] font-normal">POS + Session Management</div>
+        <div className="text-[1.2em] font-bold">Royal Gaming &amp; Cafeteria</div>
+        <div className="text-[0.85em] font-normal">POS + Session Management</div>
       </div>
 
       <div className="my-1.5 border-t border-dashed border-black/40" />
@@ -49,15 +49,18 @@ export function ReceiptTemplate({ order }: { order: Order }) {
       <div className="my-1.5 border-t border-dashed border-black/40" />
 
       <div className="flex justify-between">
-        <span className="w-1/2">Item</span>
-        <span className="w-1/4 text-center">Qty</span>
-        <span className="w-1/4 text-right">Amount</span>
+        <span className="w-[55%]">Item</span>
+        <span className="w-[15%] text-center">Qty</span>
+        <span className="w-[30%] text-right">Amount</span>
       </div>
       {order.items.map((item) => (
         <div key={item.id} className="flex justify-between">
-          <span className="w-1/2 truncate">{item.product.name}</span>
-          <span className="w-1/4 text-center">{item.quantity}</span>
-          <span className="w-1/4 text-right">{formatCurrency(item.lineTotal)}</span>
+          {/* Wrap rather than truncate — on a 58mm roll most product names are
+              wider than the column, and a cut-off name on the customer's copy
+              is worse than one that runs onto a second line. */}
+          <span className="w-[55%] break-words pr-1">{item.product.name}</span>
+          <span className="w-[15%] text-center">{item.quantity}</span>
+          <span className="w-[30%] text-right">{formatCurrency(item.lineTotal)}</span>
         </div>
       ))}
 
@@ -79,7 +82,7 @@ export function ReceiptTemplate({ order }: { order: Order }) {
           <span>{formatCurrency(order.taxAmount)}</span>
         </div>
       )}
-      <div className="flex justify-between text-sm">
+      <div className="flex justify-between text-[1.2em]">
         <span>Total</span>
         <span>{formatCurrency(order.total)}</span>
       </div>
@@ -91,7 +94,7 @@ export function ReceiptTemplate({ order }: { order: Order }) {
         <span>{order.paymentMethod ? PAYMENT_LABELS[order.paymentMethod] : "—"}</span>
       </div>
 
-      <div className="mt-2 text-center text-[10px] font-normal">Thank you for visiting!</div>
+      <div className="mt-2 text-center text-[0.85em] font-normal">Thank you for visiting!</div>
     </div>
   );
 }

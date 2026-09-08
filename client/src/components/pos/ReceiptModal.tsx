@@ -1,6 +1,7 @@
 import { Printer, X } from "lucide-react";
 import { Button } from "../ui/Button";
 import { ReceiptTemplate } from "./ReceiptTemplate";
+import { printReceipt } from "../../lib/printReceipt";
 import type { Order } from "../../types";
 
 export function ReceiptModal({ order, onClose }: { order: Order; onClose: () => void }) {
@@ -27,7 +28,7 @@ export function ReceiptModal({ order, onClose }: { order: Order; onClose: () => 
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Close
           </Button>
-          <Button className="flex-1" onClick={() => window.print()}>
+          <Button className="flex-1" onClick={printReceipt}>
             <Printer size={14} /> Print Receipt
           </Button>
         </div>
