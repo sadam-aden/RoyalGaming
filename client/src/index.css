@@ -32,27 +32,31 @@
      that disappear against a dark background. */
   color-scheme: dark;
 
-  /* Printed receipt geometry.
+  /* Printed receipt geometry, for an 80mm thermal POS printer.
 
-     Receipts go to a thermal POS printer, and a thermal printer cannot print
-     to the edge of its roll: a few millimetres down each side sit outside the
-     print head's reach. So the paper is described in two parts — the physical
-     roll, and the guard band at each edge the head cannot reach — and the page
-     handed to the printer is only the printable strip in between. Declaring
-     the page as that strip rather than as the whole roll gives the browser no
-     reason to scale the receipt down to fit, and leaves nothing sitting in the
-     dead zone at either edge.
+     Two widths matter and they are not the same number. The roll is ~80mm
+     across, but the print head only reaches about 72mm of it: ~4mm down each
+     side is out of reach, whatever the page says. So the printed page is
+     declared at the full 80mm — the same width as the paper, which is what
+     stops Chrome scaling or re-centring anything — and the receipt itself is
+     laid out 72mm wide and centred inside it, which puts it exactly on the
+     part of the paper the head can reach.
 
-     --receipt-roll-width is the knob to turn for different paper: 80mm is the
-     common POS roll, 58mm the narrow one. --receipt-edge-guard is per side and
-     is deliberately generous, since rolls are rarely loaded perfectly centred.
+     The page height is not fixed. A receipt runs as long as the order needs
+     and no longer: printReceipt measures the rendered receipt and declares a
+     page that size, so there is no A4/Letter-shaped sheet with the receipt
+     stranded in a field of white.
+
      Every size inside the receipt is em-based, so raising --receipt-font-size
      scales the whole receipt with it. */
-  --receipt-roll-width: 80mm;
-  --receipt-edge-guard: 4mm;
-  --receipt-print-width: calc(var(--receipt-roll-width) - 2 * var(--receipt-edge-guard));
+  --receipt-paper-width: 80mm;
+  --receipt-print-width: 72mm;
   --receipt-padding-y: 4mm;
-  --receipt-padding-x: 1.5mm;
+  /* A hair inside the printable width rather than flush against it: the
+     72mm is a nominal figure and rolls sit a little differently each time, so
+     the last character of an amount should not be riding the boundary. Two
+     characters is what it costs. Set it to 0 to use every millimetre. */
+  --receipt-padding-x: 1mm;
   --receipt-font-size: 13px;
   --receipt-line-height: 1.5;
 }
@@ -91,25 +95,28 @@ body {
    into .receipt-print-root and calls window.print(), so Chrome's own dialog
    opens on the sale that was just rung up with nothing in between.
 
-   On screen that root is parked outside the viewport — never seen. When printing, the app is hidden
-   and the receipt takes its place as the whole document.
+   On screen that root is parked outside the viewport, never seen. When
+   printing, the app is hidden and the receipt takes its place as the whole
+   document.
 
-   The sheet is exactly the printer's printable strip, at real millimetre
-   dimensions. Its height is left to the content; where that runs past the
-   105mm page, the receipt carries on to a second page rather than being
-   scaled down to fit.
+   The root is the width of the paper; the sheet inside it is the width the
+   print head can actually reach, centred on the paper. Height is left to the
+   content in both cases.
    --------------------------------------------------------------------------- */
 .receipt-print-root {
   position: absolute;
   top: 0;
   left: -100vw;
-  width: var(--receipt-print-width);
+  width: var(--receipt-paper-width);
 }
 
 .print-sheet {
   box-sizing: border-box;
   width: var(--receipt-print-width);
   max-width: var(--receipt-print-width);
+  /* Centred on the paper: the ~4mm left over on each side is the strip the
+     print head cannot reach, not padding that could be reclaimed. */
+  margin-inline: auto;
   padding: var(--receipt-padding-y) var(--receipt-padding-x);
   background: #fff;
   color: #000;
@@ -129,19 +136,21 @@ body {
 }
 
 @media print {
-  /* The paper: 72mm wide, 105mm tall, and no page margin - the sheet is
-     already inset from the roll's edges by --receipt-edge-guard, so the page
-     itself takes none.
+  /* The page is declared by printReceipt at print time: 80mm wide, the width
+     of the paper, by however tall the receipt turned out. It cannot be written
+     here, because the height is not known until the receipt is rendered and
+     @page descriptors cannot read custom properties.
 
-     Both dimensions are spelled out in millimetres. CSS names only a handful
-     of page sizes - A5, A4, A3, B5, B4, letter, legal, ledger - so any other
-     name (A7, say) is invalid, gets dropped along with the rest of the
-     declaration, and prints the receipt on the default paper instead; the
-     same trap as `size: <length> auto`, which once took receipts onto A4.
-     The 72mm is --receipt-print-width written out by hand, since @page
-     descriptors cannot read custom properties, so change the two together. */
+     Two ways this rule can quietly break, both of which have bitten this code
+     before. `size: <length> auto` is invalid — mixing a length with the
+     keyword drops the whole declaration and falls back to A4. And CSS names
+     only a handful of page sizes (A5, A4, A3, B5, B4, letter, legal, ledger),
+     so `size: A7` is invalid too and prints on the default paper. Only two
+     real lengths work here.
+
+     Only the margin is fixed: the receipt is already inset from the paper's
+     edges by being centred at 72mm, so the page itself takes none. */
   @page {
-    size: 72mm 105mm;
     margin: 0;
   }
   html,
