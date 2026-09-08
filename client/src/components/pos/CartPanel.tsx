@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { CreditCard, Minus, Plus, Smartphone, Trash2, Wallet } from "lucide-react";
 import { useCartStore } from "../../store/cartStore";
 import { Button } from "../ui/Button";
 import { formatCurrency } from "../../lib/format";
 import { customersApi, discountsApi, ordersApi, settingsApi, staffApi } from "../../lib/resources";
 import { apiErrorMessage } from "../../lib/api";
+import { printReceipt } from "../../lib/printReceipt";
 import type { Customer, Discount, OrderType, PaymentMethod, StaffMember } from "../../types";
 
 const ORDER_TYPES: { value: OrderType; label: string }[] = [
@@ -32,7 +32,6 @@ export function CartPanel({ onOrderComplete }: { onOrderComplete: () => void }) 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>("MOBILE");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     customersApi.list().then((r) => setCustomers(r.data));
@@ -74,9 +73,10 @@ export function CartPanel({ onOrderComplete }: { onOrderComplete: () => void }) 
       clear();
       setPaymentMethod("MOBILE");
       onOrderComplete();
-      // A completed sale goes straight to its printable receipt; held orders
-      // stay on the POS since they are not finished yet.
-      if (!hold) navigate(`/print/order/${res.data.id}`);
+      // A completed sale prints its receipt straight away — the cashier stays
+      // on the POS and gets Chrome's print dialog. Held orders are not finished
+      // yet, so nothing prints.
+      if (!hold) await printReceipt(res.data);
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {

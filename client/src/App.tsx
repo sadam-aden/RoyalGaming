@@ -14,7 +14,6 @@ import { DiscountsPage } from "./pages/Discounts/DiscountsPage";
 import { CustomersPage } from "./pages/Customers/CustomersPage";
 import { ProductsAdminPage } from "./pages/Settings/ProductsAdminPage";
 import { StaffAdminPage } from "./pages/Settings/StaffAdminPage";
-import { PrintReceiptPage } from "./pages/Print/PrintReceiptPage";
 
 export function App() {
   return (
@@ -26,7 +25,6 @@ export function App() {
         <Route element={<ProtectedRoute />}>
           {/* Opened in its own tab from the receipt modal, so it deliberately
               sits outside DashboardLayout — the page is the printable sheet. */}
-          <Route path="print/order/:id" element={<PrintReceiptPage />} />
 
           <Route element={<DashboardLayout />}>
             <Route index element={<LiveSessionsPage />} />

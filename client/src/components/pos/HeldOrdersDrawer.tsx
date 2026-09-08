@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { ordersApi } from "../../lib/resources";
 import { apiErrorMessage } from "../../lib/api";
+import { printReceipt } from "../../lib/printReceipt";
 import { formatCurrency } from "../../lib/format";
 import type { Order, PaymentMethod } from "../../types";
 
@@ -14,7 +14,6 @@ export function HeldOrdersDrawer({ onClose, onChanged }: { onClose: () => void; 
   const [loading, setLoading] = useState(true);
   const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   function refresh() {
     setLoading(true);
@@ -33,8 +32,8 @@ export function HeldOrdersDrawer({ onClose, onChanged }: { onClose: () => void; 
       setCheckoutOrderId(null);
       refresh();
       onChanged();
-      // Settling a held order completes the sale, so go to its receipt.
-      navigate(`/print/order/${res.data.id}`);
+      // Settling a held order completes the sale, so print its receipt.
+      await printReceipt(res.data);
     } catch (err) {
       setError(apiErrorMessage(err));
     }

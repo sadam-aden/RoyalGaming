@@ -32,17 +32,29 @@
      that disappear against a dark background. */
   color-scheme: dark;
 
-  /* Printed receipt geometry. A receipt is one A6 page (105mm x 148mm — a
-     quarter of A4), printed on its own rather than in the corner of a bigger
-     sheet. Raising --receipt-font-size makes the text bigger; every size inside
-     the receipt is em-based, so the whole receipt scales with it, and it is
-     shrunk automatically if a long order would otherwise run off the page. */
-  --sheet-width: 105mm;
-  --sheet-height: 148mm;
-  --receipt-padding-y: 7mm;
-  --receipt-padding-x: 6mm;
-  --receipt-font-size: 18.5px;
-  --receipt-line-height: 1.6;
+  /* Printed receipt geometry.
+
+     Receipts go to a thermal POS printer, and a thermal printer cannot print
+     to the edge of its roll: a few millimetres down each side sit outside the
+     print head's reach. So the paper is described in two parts — the physical
+     roll, and the guard band at each edge the head cannot reach — and the page
+     handed to the printer is only the printable strip in between. Declaring
+     the page as that strip rather than as the whole roll gives the browser no
+     reason to scale the receipt down to fit, and leaves nothing sitting in the
+     dead zone at either edge.
+
+     --receipt-roll-width is the knob to turn for different paper: 80mm is the
+     common POS roll, 58mm the narrow one. --receipt-edge-guard is per side and
+     is deliberately generous, since rolls are rarely loaded perfectly centred.
+     Every size inside the receipt is em-based, so raising --receipt-font-size
+     scales the whole receipt with it. */
+  --receipt-roll-width: 80mm;
+  --receipt-edge-guard: 4mm;
+  --receipt-print-width: calc(var(--receipt-roll-width) - 2 * var(--receipt-edge-guard));
+  --receipt-padding-y: 4mm;
+  --receipt-padding-x: 1.5mm;
+  --receipt-font-size: 13px;
+  --receipt-line-height: 1.5;
 }
 
 html,
@@ -73,21 +85,35 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Printable receipt page (/print/order/:id)
+   Printed receipt
 
-   One A6 page, rendered at real millimetre dimensions on screen as well as on
-   paper, so the preview is exactly what comes out of the printer — no separate
-   print-only restyling that can drift from what was reviewed on screen.
+   Printing happens in place, from the POS: printReceipt() mounts the receipt
+   into .receipt-print-root and calls window.print(), so Chrome's own dialog
+   opens on the sale that was just rung up with nothing in between.
+
+   On screen that root is parked outside the viewport — laid out (the page
+   length is measured off it) but never seen. When printing, the app is hidden
+   and the receipt takes its place as the whole document.
+
+   The sheet is exactly the printer's printable strip, at real millimetre
+   dimensions. Its height is left to the content, so a long order gets a longer
+   page instead of being scaled down to fit a fixed one.
    --------------------------------------------------------------------------- */
+.receipt-print-root {
+  position: absolute;
+  top: 0;
+  left: -100vw;
+  width: var(--receipt-print-width);
+}
+
 .print-sheet {
   box-sizing: border-box;
-  width: var(--sheet-width);
-  height: var(--sheet-height);
+  width: var(--receipt-print-width);
+  max-width: var(--receipt-print-width);
   padding: var(--receipt-padding-y) var(--receipt-padding-x);
   background: #fff;
   color: #000;
   flex-shrink: 0;
-  overflow: hidden;
 }
 
 .print-sheet .receipt-print-area {
@@ -95,18 +121,35 @@ body {
   font-weight: 800;
   font-size: var(--receipt-font-size);
   line-height: var(--receipt-line-height);
+  /* Nothing inside the receipt may reach past the printable strip: a product
+     name with no spaces in it is broken mid-word rather than pushing its row
+     wider than the paper and carrying the amount off the right edge. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 @media print {
+  /* The page size is injected at print time from the rendered sheet — see
+     printReceipt. Only the margin is fixed here: the sheet is already inset
+     from the roll's edges by --receipt-edge-guard, so the page itself takes
+     none. */
   @page {
-    size: A6;
     margin: 0;
   }
   html,
   body {
+    height: auto;
     background: #fff;
   }
-  /* Print the page on its own — no app chrome, no padding around it. */
+  /* Print the receipt on its own: the app is not part of the printout, and the
+     receipt comes back from off-screen to sit at the page origin. */
+  #root {
+    display: none !important;
+  }
+  .receipt-print-root {
+    position: static;
+    left: auto;
+  }
   .print-sheet {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
