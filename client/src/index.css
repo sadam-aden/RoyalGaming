@@ -91,13 +91,13 @@ body {
    into .receipt-print-root and calls window.print(), so Chrome's own dialog
    opens on the sale that was just rung up with nothing in between.
 
-   On screen that root is parked outside the viewport — laid out (the page
-   length is measured off it) but never seen. When printing, the app is hidden
+   On screen that root is parked outside the viewport — never seen. When printing, the app is hidden
    and the receipt takes its place as the whole document.
 
    The sheet is exactly the printer's printable strip, at real millimetre
-   dimensions. Its height is left to the content, so a long order gets a longer
-   page instead of being scaled down to fit a fixed one.
+   dimensions. Its height is left to the content; where that runs past the
+   105mm page, the receipt carries on to a second page rather than being
+   scaled down to fit.
    --------------------------------------------------------------------------- */
 .receipt-print-root {
   position: absolute;
@@ -129,11 +129,19 @@ body {
 }
 
 @media print {
-  /* The page size is injected at print time from the rendered sheet — see
-     printReceipt. Only the margin is fixed here: the sheet is already inset
-     from the roll's edges by --receipt-edge-guard, so the page itself takes
-     none. */
+  /* The paper: 72mm wide, 105mm tall, and no page margin - the sheet is
+     already inset from the roll's edges by --receipt-edge-guard, so the page
+     itself takes none.
+
+     Both dimensions are spelled out in millimetres. CSS names only a handful
+     of page sizes - A5, A4, A3, B5, B4, letter, legal, ledger - so any other
+     name (A7, say) is invalid, gets dropped along with the rest of the
+     declaration, and prints the receipt on the default paper instead; the
+     same trap as `size: <length> auto`, which once took receipts onto A4.
+     The 72mm is --receipt-print-width written out by hand, since @page
+     descriptors cannot read custom properties, so change the two together. */
   @page {
+    size: 72mm 105mm;
     margin: 0;
   }
   html,
