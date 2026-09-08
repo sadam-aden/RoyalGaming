@@ -59,18 +59,20 @@ server/   Express API + Socket.io + Prisma schema/migrations/seed
 
    Seed data creates one location, six stations (3x PlayStation, Pool Table,
    Foosball Table, Skating Rink), a full product catalog (time packages for
-   PlayStation/Table Games/Skating, coffee, and cafeteria items), and two staff
-   accounts:
+   PlayStation/Table Games/Skating, coffee, and cafeteria items), and an admin
+   and a cashier account. The seeded passwords are in `server/prisma/seed.ts` —
+   change them from inside the app once you are running.
 
-   - Admin: `admin@royalgaming.local` / `Admin123!`
-   - Cashier: `cashier@royalgaming.local` / `Cashier123!`
-
-4. **Run the app** (two terminals):
+4. **Run the app**:
 
    ```bash
-   npm run dev:server   # http://localhost:4000
-   npm run dev:client   # http://localhost:5173
+   npm run dev
    ```
+
+   That starts the API and the client together and stops both with Ctrl+C.
+   To run them separately, use `npm run dev:server` and `npm run dev:client`.
+   If a previous run was left behind and the ports are still busy, clear it
+   with `npm run dev:stop`.
 
    The client dev server proxies `/api` and `/socket.io` to the server, so just
    open `http://localhost:5173` and log in.

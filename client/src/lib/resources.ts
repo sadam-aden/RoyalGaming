@@ -35,6 +35,7 @@ export interface CreateOrderPayload {
 
 export const ordersApi = {
   create: (payload: CreateOrderPayload) => api.post<Order>("/orders", payload),
+  get: (id: string) => api.get<Order>(`/orders/${id}`),
   list: (status?: string) => api.get<Order[]>("/orders", { params: status ? { status } : undefined }),
   checkout: (id: string, paymentMethod: PaymentMethod) =>
     api.patch<Order>(`/orders/${id}/checkout`, { paymentMethod }),

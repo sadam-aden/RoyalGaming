@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { CreditCard, Minus, Plus, Smartphone, Trash2, Wallet } from "lucide-react";
 import { useCartStore } from "../../store/cartStore";
 import { Button } from "../ui/Button";
 import { formatCurrency } from "../../lib/format";
 import { customersApi, discountsApi, ordersApi, settingsApi, staffApi } from "../../lib/resources";
 import { apiErrorMessage } from "../../lib/api";
-import { ReceiptModal } from "./ReceiptModal";
-import type { Customer, Discount, Order, OrderType, PaymentMethod, StaffMember } from "../../types";
+import type { Customer, Discount, OrderType, PaymentMethod, StaffMember } from "../../types";
 
 const ORDER_TYPES: { value: OrderType; label: string }[] = [
   { value: "WALK", label: "Walk-in" },
@@ -32,7 +32,7 @@ export function CartPanel({ onOrderComplete }: { onOrderComplete: () => void }) 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>("MOBILE");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     customersApi.list().then((r) => setCustomers(r.data));
@@ -73,8 +73,10 @@ export function CartPanel({ onOrderComplete }: { onOrderComplete: () => void }) 
       });
       clear();
       setPaymentMethod("MOBILE");
-      if (!hold) setReceiptOrder(res.data);
       onOrderComplete();
+      // A completed sale goes straight to its printable receipt; held orders
+      // stay on the POS since they are not finished yet.
+      if (!hold) navigate(`/print/order/${res.data.id}`);
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -222,7 +224,6 @@ export function CartPanel({ onOrderComplete }: { onOrderComplete: () => void }) 
         </div>
       </div>
 
-      {receiptOrder && <ReceiptModal order={receiptOrder} onClose={() => setReceiptOrder(null)} />}
     </div>
   );
 }

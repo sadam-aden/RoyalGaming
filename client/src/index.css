@@ -32,17 +32,17 @@
      that disappear against a dark background. */
   color-scheme: dark;
 
-  /* Printed receipt geometry — single source of truth, read both by the
-     @media print rules below and by ReceiptModal when it measures the strip
-     to set an exact page height. 58mm is the standard narrow thermal roll;
-     switch to 80mm here if the shop's printer uses the wider roll.
-     Raising --receipt-font-size makes the whole printout taller and bolder,
-     since every size inside the receipt is em-based. */
-  --receipt-width: 58mm;
-  --receipt-padding-y: 4mm;
-  --receipt-padding-x: 2mm;
-  --receipt-font-size: 13px;
-  --receipt-line-height: 1.55;
+  /* Printed receipt geometry. A receipt is one A6 page (105mm x 148mm — a
+     quarter of A4), printed on its own rather than in the corner of a bigger
+     sheet. Raising --receipt-font-size makes the text bigger; every size inside
+     the receipt is em-based, so the whole receipt scales with it, and it is
+     shrunk automatically if a long order would otherwise run off the page. */
+  --sheet-width: 105mm;
+  --sheet-height: 148mm;
+  --receipt-padding-y: 7mm;
+  --receipt-padding-x: 6mm;
+  --receipt-font-size: 18.5px;
+  --receipt-line-height: 1.6;
 }
 
 html,
@@ -72,36 +72,43 @@ body {
   border-radius: 9999px;
 }
 
+/* ---------------------------------------------------------------------------
+   Printable receipt page (/print/order/:id)
+
+   One A6 page, rendered at real millimetre dimensions on screen as well as on
+   paper, so the preview is exactly what comes out of the printer — no separate
+   print-only restyling that can drift from what was reviewed on screen.
+   --------------------------------------------------------------------------- */
+.print-sheet {
+  box-sizing: border-box;
+  width: var(--sheet-width);
+  height: var(--sheet-height);
+  padding: var(--receipt-padding-y) var(--receipt-padding-x);
+  background: #fff;
+  color: #000;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.print-sheet .receipt-print-area {
+  color: #000;
+  font-weight: 800;
+  font-size: var(--receipt-font-size);
+  line-height: var(--receipt-line-height);
+}
+
 @media print {
-  /* Fallback page size, used only if printing is triggered outside the receipt
-     modal (e.g. Ctrl+P). The modal measures the rendered strip and injects an
-     exact `size: <width> <height>` rule at print time, which overrides this.
-     Note: `size: 58mm auto` is INVALID CSS — mixing a length with `auto` makes
-     the browser drop the whole declaration and fall back to A4/Letter, which is
-     what produced the large blank area on printouts. Always give two lengths. */
   @page {
-    size: 58mm 150mm;
+    size: A6;
     margin: 0;
   }
-  body * {
-    visibility: hidden;
+  html,
+  body {
+    background: #fff;
   }
-  .receipt-print-area,
-  .receipt-print-area * {
-    visibility: visible;
+  /* Print the page on its own — no app chrome, no padding around it. */
+  .print-sheet {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-  }
-  .receipt-print-area {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: var(--receipt-width);
-    padding: var(--receipt-padding-y) var(--receipt-padding-x);
-    color: #000;
-    background: #fff;
-    font-weight: 800;
-    font-size: var(--receipt-font-size);
-    line-height: var(--receipt-line-height);
   }
 }

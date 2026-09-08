@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { ordersApi } from "../../lib/resources";
 import { apiErrorMessage } from "../../lib/api";
 import { formatCurrency } from "../../lib/format";
-import { ReceiptModal } from "./ReceiptModal";
 import type { Order, PaymentMethod } from "../../types";
 
 const METHODS: PaymentMethod[] = ["MOBILE", "CASH", "CARD", "CREDIT"];
@@ -14,7 +14,7 @@ export function HeldOrdersDrawer({ onClose, onChanged }: { onClose: () => void; 
   const [loading, setLoading] = useState(true);
   const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+  const navigate = useNavigate();
 
   function refresh() {
     setLoading(true);
@@ -31,9 +31,10 @@ export function HeldOrdersDrawer({ onClose, onChanged }: { onClose: () => void; 
     try {
       const res = await ordersApi.checkout(id, method);
       setCheckoutOrderId(null);
-      setReceiptOrder(res.data);
       refresh();
       onChanged();
+      // Settling a held order completes the sale, so go to its receipt.
+      navigate(`/print/order/${res.data.id}`);
     } catch (err) {
       setError(apiErrorMessage(err));
     }
@@ -100,7 +101,6 @@ export function HeldOrdersDrawer({ onClose, onChanged }: { onClose: () => void; 
       )}
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
-      {receiptOrder && <ReceiptModal order={receiptOrder} onClose={() => setReceiptOrder(null)} />}
     </Modal>
   );
 }
