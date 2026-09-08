@@ -23,9 +23,6 @@ export function App() {
         <Route path="/tv" element={<TvDisplayPage />} />
 
         <Route element={<ProtectedRoute />}>
-          {/* Opened in its own tab from the receipt modal, so it deliberately
-              sits outside DashboardLayout — the page is the printable sheet. */}
-
           <Route element={<DashboardLayout />}>
             <Route index element={<LiveSessionsPage />} />
             <Route path="pos" element={<POSPage />} />

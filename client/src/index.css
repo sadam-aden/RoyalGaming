@@ -32,31 +32,41 @@
      that disappear against a dark background. */
   color-scheme: dark;
 
+
   /* Printed receipt geometry, for an 80mm thermal POS printer.
 
-     Two widths matter and they are not the same number. The roll is ~80mm
-     across, but the print head only reaches about 72mm of it: ~4mm down each
-     side is out of reach, whatever the page says. So the printed page is
-     declared at the full 80mm — the same width as the paper, which is what
-     stops Chrome scaling or re-centring anything — and the receipt itself is
-     laid out 72mm wide and centred inside it, which puts it exactly on the
-     part of the paper the head can reach.
+     Three numbers matter, and only two of them are the page.
 
-     The page height is not fixed. A receipt runs as long as the order needs
-     and no longer: printReceipt measures the rendered receipt and declares a
-     page that size, so there is no A4/Letter-shaped sheet with the receipt
-     stranded in a field of white.
+     The roll is ~80mm across, but the print head only reaches about 72mm of
+     it: ~4mm down each side is out of reach whatever the page says. That 72mm
+     strip — the printable area, not the roll — is what the page is declared
+     as, because Chrome fits every page it renders into the printer's
+     *printable area* and centres it there. Declare a page wider than 72mm and
+     Chrome scales it down to fit; a scaled-down page no longer fills the
+     paper, so it also gets centred, and that is where the band of white above
+     the receipt came from. At exactly 72mm the scale factor is 1 and there is
+     nothing left over to centre in.
+
+     The page height is the driver's page length — 297mm, from the
+     "80(72) x 297mm" paper this printer is set to — and deliberately not the
+     height of the receipt. A page shorter than the paper is centred on it by
+     that same rule: half the leftover paper above the receipt, half below,
+     which is exactly what a receipt must not do. Matching the paper's length
+     leaves no slack to centre in, so the receipt starts hard against the top
+     edge and every millimetre of unused paper falls below it.
 
      Every size inside the receipt is em-based, so raising --receipt-font-size
      scales the whole receipt with it. */
-  --receipt-paper-width: 80mm;
   --receipt-print-width: 72mm;
-  --receipt-padding-y: 4mm;
-  /* A hair inside the printable width rather than flush against it: the
-     72mm is a nominal figure and rolls sit a little differently each time, so
-     the last character of an amount should not be riding the boundary. Two
+  /* A hair inside the printable width rather than flush against it: the 72mm
+     is a nominal figure and rolls sit a little differently each time, so the
+     last character of an amount should not be riding the boundary. Two
      characters is what it costs. Set it to 0 to use every millimetre. */
   --receipt-padding-x: 1mm;
+  /* Nothing above the first line — the receipt has to begin at the very top of
+     the printable area. The tail below it is feed for the cutter, not layout. */
+  --receipt-padding-top: 0;
+  --receipt-padding-bottom: 6mm;
   --receipt-font-size: 13px;
   --receipt-line-height: 1.5;
 }
@@ -93,34 +103,34 @@ body {
 
    Printing happens in place, from the POS: printReceipt() mounts the receipt
    into .receipt-print-root and calls window.print(), so Chrome's own dialog
-   opens on the sale that was just rung up with nothing in between.
+   opens on the sale that was just rung up with nothing in between — no receipt
+   page, no second tab, no second Print button.
 
    On screen that root is parked outside the viewport, never seen. When
-   printing, the app is hidden and the receipt takes its place as the whole
-   document.
+   printing the app is hidden and the receipt takes its place as the whole
+   document, laid out from the page origin down.
 
-   The root is the width of the paper; the sheet inside it is the width the
-   print head can actually reach, centred on the paper. Height is left to the
-   content in both cases.
+   Root and sheet are both the printable width, which is also the width of the
+   declared page, so there is nothing to inset, scale or centre. Height is
+   whatever the receipt comes to.
    --------------------------------------------------------------------------- */
 .receipt-print-root {
   position: absolute;
   top: 0;
   left: -100vw;
-  width: var(--receipt-paper-width);
+  width: var(--receipt-print-width);
 }
 
 .print-sheet {
   box-sizing: border-box;
   width: var(--receipt-print-width);
-  max-width: var(--receipt-print-width);
-  /* Centred on the paper: the ~4mm left over on each side is the strip the
-     print head cannot reach, not padding that could be reclaimed. */
-  margin-inline: auto;
-  padding: var(--receipt-padding-y) var(--receipt-padding-x);
+  padding: var(--receipt-padding-top) var(--receipt-padding-x) var(--receipt-padding-bottom);
   background: #fff;
   color: #000;
-  flex-shrink: 0;
+  /* A block formatting context, so that a top margin on anything inside the
+     receipt collapses within the sheet instead of escaping through the
+     zero-height top padding and reappearing as white above the receipt. */
+  display: flow-root;
 }
 
 .print-sheet .receipt-print-area {
@@ -136,26 +146,38 @@ body {
 }
 
 @media print {
-  /* The page is declared by printReceipt at print time: 80mm wide, the width
-     of the paper, by however tall the receipt turned out. It cannot be written
-     here, because the height is not known until the receipt is rendered and
-     @page descriptors cannot read custom properties.
+  /* The page is the printable strip of the roll — 72mm across — by the
+     driver's own page length of 297mm. Matching the paper on both axes is the
+     whole fix: Chrome scales each rendered page to fit the printable area and
+     centres what is left, so any other page size comes back shrunk and
+     stranded in the middle of the paper.
 
-     Two ways this rule can quietly break, both of which have bitten this code
-     before. `size: <length> auto` is invalid — mixing a length with the
-     keyword drops the whole declaration and falls back to A4. And CSS names
-     only a handful of page sizes (A5, A4, A3, B5, B4, letter, legal, ledger),
-     so `size: A7` is invalid too and prints on the default paper. Only two
-     real lengths work here.
+     Both numbers have to be literals: @page descriptors cannot read custom
+     properties, so 72mm is kept in step with --receipt-print-width by hand,
+     and 297mm follows the paper chosen in the printer driver.
 
-     Only the margin is fixed: the receipt is already inset from the paper's
-     edges by being centred at 72mm, so the page itself takes none. */
+     Ways this rule quietly breaks, all of which have bitten this code before.
+     `size: 72mm auto` is invalid — mixing a length with the keyword drops the
+     whole declaration and falls back to A4, which is how receipts once ended
+     up marooned on a big sheet. CSS names only a handful of page sizes (A5,
+     A4, A3, B5, B4, letter, legal, ledger), so `size: A7` is invalid too and
+     prints on the default paper. And a measured, receipt-height page — which
+     is what this used to declare — is shorter than the paper and therefore
+     centred on it. Two real lengths, both matching the paper.
+
+     The page takes no margin of its own: the receipt's own padding is the only
+     inset, so the first line sits at the top edge of the printable area. */
   @page {
+    size: 72mm 297mm;
     margin: 0;
   }
   html,
   body {
+    /* height: 100% is a screen rule. Left in place it would make the body as
+       tall as the page and hand the printed flow a full-page box to sit in. */
     height: auto;
+    margin: 0;
+    padding: 0;
     background: #fff;
   }
   /* Print the receipt on its own: the app is not part of the printout, and the
@@ -165,7 +187,8 @@ body {
   }
   .receipt-print-root {
     position: static;
-    left: auto;
+    inset: auto;
+    margin: 0;
   }
   .print-sheet {
     -webkit-print-color-adjust: exact;
