@@ -85,7 +85,7 @@ export function CartPanel({ onOrderComplete }: { onOrderComplete: () => void }) 
   }
 
   return (
-    <div className="flex h-full w-full shrink-0 flex-col border-l border-border bg-surface lg:w-96">
+    <div className="flex h-full w-full flex-col border-l border-border bg-surface">
       <div className="border-b border-border-soft p-4">
         <div className="flex gap-1.5 rounded-xl bg-surface-alt p-1">
           {ORDER_TYPES.map((t) => (

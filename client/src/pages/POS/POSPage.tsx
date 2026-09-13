@@ -101,7 +101,7 @@ export function POSPage() {
         )}
 
         <div
-          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm transition-transform duration-200 lg:static lg:z-auto lg:max-w-none lg:translate-x-0 lg:transition-none ${
+          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm transition-transform duration-200 lg:static lg:z-auto lg:w-96 lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:transition-none ${
             cartOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
