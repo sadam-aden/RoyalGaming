@@ -72,11 +72,17 @@ export const requireAuth = asyncHandler(async (req: Request, _res: Response, nex
   if (!staff || !staff.active) throw new HttpError(401, "Account is no longer active");
 
   // `iat` only has second resolution, so a token issued in the same second as a
-  // password change is indistinguishable from one issued just before it.
-  // Rounding the change *up* resolves that tie against the token: better to ask
-  // someone to sign in again than to leave a one-second window in which a stolen
-  // token outlives the password change meant to kill it.
-  const changedAt = Math.ceil(staff.passwordChangedAt.getTime() / 1000);
+  // password change cannot be ordered against it. The tie has to fall somewhere:
+  //
+  //   - resolve it against the token and every account's *first* token is
+  //     refused, because a new row's passwordChangedAt is its creation instant;
+  //   - resolve it in the token's favour and a token minted in the same second
+  //     as a change survives.
+  //
+  // The second is the right cost. A token worth revoking is minutes or hours
+  // old, not milliseconds, so the window is theoretical — whereas refusing the
+  // password someone just set is a fault they will hit every time.
+  const changedAt = Math.floor(staff.passwordChangedAt.getTime() / 1000);
   if (payload.iat !== undefined && payload.iat < changedAt) {
     throw new HttpError(401, "Password changed — please sign in again");
   }
