@@ -7,6 +7,7 @@ import { POSPage } from "./pages/POS/POSPage";
 import { AnalyticsPage } from "./pages/Analytics/AnalyticsPage";
 import { TvDisplayPage } from "./pages/TvDisplay/TvDisplayPage";
 import { ExpensesPage } from "./pages/Expenses/ExpensesPage";
+import { SalesReportPage } from "./pages/Reports/SalesReportPage";
 import { WeeklyReportPage } from "./pages/Reports/WeeklyReportPage";
 import { VatReportPage } from "./pages/Reports/VatReportPage";
 import { GeneralReportsPage } from "./pages/Reports/GeneralReportsPage";
@@ -32,6 +33,7 @@ export function App() {
 
             <Route element={<ProtectedRoute roles={["ADMIN"]} />}>
               <Route path="expenses" element={<ExpensesPage />} />
+              <Route path="reports/sales" element={<SalesReportPage />} />
               <Route path="reports/weekly" element={<WeeklyReportPage />} />
               <Route path="reports/vat" element={<VatReportPage />} />
               <Route path="reports/general" element={<GeneralReportsPage />} />

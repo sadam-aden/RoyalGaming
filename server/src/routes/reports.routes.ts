@@ -6,9 +6,43 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { round2 } from "../utils/pricing";
 import { sendCsv } from "../utils/csv";
 import { qualifiedProductLabel } from "../utils/productLabel";
+import { resolveRange } from "../utils/dateRange";
+import { buildSalesReport, salesReportCsvRows } from "../services/salesReport";
 
 const router = Router();
 router.use(requireAuth, requireRole("ADMIN"));
+
+/** How many ranked items the report returns when the caller does not say. */
+const DEFAULT_ITEM_LIMIT = 15;
+const MAX_ITEM_LIMIT = 200;
+
+/**
+ * Sales report for any span of whole days.
+ *
+ * The one endpoint the Sales Report page calls: totals, category and item
+ * rankings, a daily trend and the payment split, all in a single response so
+ * changing the period is one request rather than six.
+ *
+ * Rankings carry both units and money, and the page re-sorts them client-side —
+ * so the "most used" question can be asked either way without coming back here.
+ */
+router.get(
+  "/sales",
+  asyncHandler(async (req, res) => {
+    const range = resolveRange(req.query as Record<string, unknown>);
+    const requested = Number(req.query.limit ?? DEFAULT_ITEM_LIMIT);
+    const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), MAX_ITEM_LIMIT) : DEFAULT_ITEM_LIMIT;
+
+    const report = await buildSalesReport(range, limit);
+
+    if (req.query.format === "csv") {
+      // BOM on, unlike the older exports: this file carries product names.
+      return sendCsv(res, `sales-report-${range.fromKey}-to-${range.toKey}.csv`, salesReportCsvRows(report), { bom: true });
+    }
+
+    res.json(report);
+  })
+);
 
 function startOfWeek(d: Date) {
   const date = new Date(d);
@@ -35,7 +69,7 @@ router.get(
           status: OrderStatus.COMPLETED,
           createdAt: { gte: weekStart, lt: weekEnd },
         },
-        include: { items: { include: { product: true } } },
+        include: { items: { include: { product: { include: { category: true } } } } },
       }),
       prisma.expense.aggregate({
         where: { locationId: DEFAULT_LOCATION_ID, date: { gte: weekStart, lt: weekEnd } },

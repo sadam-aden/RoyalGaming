@@ -9,8 +9,18 @@ export function toCsv(rows: Record<string, unknown>[]): string {
   return lines.join("\n");
 }
 
-export function sendCsv(res: import("express").Response, filename: string, rows: Record<string, unknown>[]) {
-  res.setHeader("Content-Type", "text/csv");
+/**
+ * `bom` prefixes a UTF-8 byte order mark. Excel assumes the system codepage for
+ * a .csv without one, which turns any non-ASCII product name into mojibake.
+ * Opt-in rather than default so the reports that predate this stay byte-identical.
+ */
+export function sendCsv(
+  res: import("express").Response,
+  filename: string,
+  rows: Record<string, unknown>[],
+  opts: { bom?: boolean } = {},
+) {
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send(toCsv(rows));
+  res.send(opts.bom ? `\uFEFF${toCsv(rows)}` : toCsv(rows));
 }

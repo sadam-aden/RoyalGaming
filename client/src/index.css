@@ -133,6 +133,17 @@ body {
   display: flow-root;
 }
 
+/* The printed sales report. Parked off-screen like the receipt, but laid out at
+   A4's content width — 210mm less the 12mm side margins its print rule sets.
+   The page geometry itself is injected at print time by printSalesReport, since
+   the receipt's 72mm @page lives in this file and would otherwise win. */
+.report-print-root {
+  position: absolute;
+  top: 0;
+  left: -100vw;
+  width: 186mm;
+}
+
 .print-sheet .receipt-print-area {
   color: #000;
   font-weight: 800;
@@ -193,5 +204,14 @@ body {
   .print-sheet {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  /* Same trip back from off-screen for the sales report. Everything else about
+     how it prints — the A4 page, and the light-on-white styling the dark app
+     cannot supply — is injected by printSalesReport only while that print is
+     running, so the @page above stays in force for receipts. */
+  .report-print-root {
+    position: static;
+    inset: auto;
+    margin: 0;
   }
 }

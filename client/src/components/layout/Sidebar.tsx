@@ -10,6 +10,7 @@ import {
   Package,
   Percent,
   Receipt,
+  TrendingUp,
   Tv,
   UserCog,
   Users,
@@ -66,6 +67,7 @@ export function Sidebar() {
           </div>
           <nav className="flex flex-col gap-1">
             <Item to="/expenses" icon={Wallet} label="Expenses" />
+            <Item to="/reports/sales" icon={TrendingUp} label="Sales Report" />
             <Item to="/reports/weekly" icon={FileText} label="Weekly Report" />
             <Item to="/reports/vat" icon={Receipt} label="VAT Report" />
             <Item to="/reports/general" icon={FileText} label="General Reports" />
