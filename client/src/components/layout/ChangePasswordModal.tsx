@@ -3,6 +3,7 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { staffAdminApi } from "../../lib/staffAdminApi";
 import { apiErrorMessage } from "../../lib/api";
+import { useAuthStore } from "../../store/authStore";
 
 export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -25,7 +26,12 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await staffAdminApi.changeOwnPassword(currentPassword, newPassword);
+      const res = await staffAdminApi.changeOwnPassword(currentPassword, newPassword);
+      // Every token minted before the change is now refused, this one included,
+      // so adopt the replacement the server handed back rather than being
+      // signed out by our own password change.
+      const { user, login } = useAuthStore.getState();
+      if (user && res.data?.token) login(user, res.data.token);
       setSuccess(true);
     } catch (err) {
       setError(apiErrorMessage(err));

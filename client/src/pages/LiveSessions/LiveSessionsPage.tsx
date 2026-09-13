@@ -40,7 +40,7 @@ export function LiveSessionsPage() {
       .history(historyDate)
       .then((res) => setHistory(res.data))
       .finally(() => setLoadingHistory(false));
-  }, [historyDate, snapshot?.stats.sessionsToday]);
+  }, [historyDate, snapshot?.stats?.sessionsToday]);
 
   const stations = snapshot?.stations ?? [];
   const freeStations = stations.filter((s) => s.allowMultipleSessions || s.sessions.length === 0);
@@ -68,10 +68,10 @@ export function LiveSessionsPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Active Now" value={String(liveActiveCount)} icon={Activity} tone="accent" />
           <StatCard label="Expiring Soon" value={String(liveExpiringCount)} icon={AlertTriangle} />
-          <StatCard label="Sessions Today" value={String(snapshot?.stats.sessionsToday ?? 0)} icon={CalendarClock} />
+          <StatCard label="Sessions Today" value={String(snapshot?.stats?.sessionsToday ?? 0)} icon={CalendarClock} />
           <StatCard
             label="Revenue Today"
-            value={formatCurrency(snapshot?.stats.revenueToday ?? 0)}
+            value={formatCurrency(snapshot?.stats?.revenueToday ?? 0)}
             icon={DollarSign}
           />
         </div>

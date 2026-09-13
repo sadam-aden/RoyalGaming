@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { z } from "zod";
 import { signToken } from "../middleware/auth";
+import { loginLimiter } from "../middleware/security";
 import { prisma } from "../lib/prisma";
 import { asyncHandler, HttpError } from "../utils/asyncHandler";
 
@@ -14,6 +15,7 @@ const loginSchema = z.object({
 
 router.post(
   "/login",
+  loginLimiter,
   asyncHandler(async (req, res) => {
     const { email, password } = loginSchema.parse(req.body);
 

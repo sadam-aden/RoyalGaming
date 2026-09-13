@@ -2,7 +2,7 @@ import { SessionStatus, StationStatus, type Prisma, type Session } from "@prisma
 import { DEFAULT_LOCATION_ID, prisma } from "../lib/prisma";
 import { HttpError } from "../utils/asyncHandler";
 import { computeAmount, deriveDisplayStatus, elapsedMs, remainingMs } from "../utils/sessionTime";
-import { getIo, SOCKET_EVENTS } from "../sockets/io";
+import { getIo, publicSnapshot, SOCKET_EVENTS, STAFF_ROOM } from "../sockets/io";
 
 // Session carries a BigInt (totalPausedMs) and Decimal fields (ratePerHour,
 // finalAmount) that Express's res.json() cannot serialize directly.
@@ -296,6 +296,9 @@ export async function buildSnapshot(locationId: string = DEFAULT_LOCATION_ID) {
 
 export async function broadcastSnapshot(locationId: string = DEFAULT_LOCATION_ID) {
   const snapshot = await buildSnapshot(locationId);
-  getIo().emit(SOCKET_EVENTS.SESSIONS_SNAPSHOT, snapshot);
+  // Staff see the stats; the public TV board sees only the stations. Sending
+  // one payload to everyone is what put the day's takings on the open internet.
+  getIo().to(STAFF_ROOM).emit(SOCKET_EVENTS.SESSIONS_SNAPSHOT, snapshot);
+  getIo().except(STAFF_ROOM).emit(SOCKET_EVENTS.SESSIONS_SNAPSHOT, publicSnapshot(snapshot));
   return snapshot;
 }

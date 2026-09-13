@@ -36,7 +36,12 @@ export interface StationSnapshot {
 
 export interface SessionsSnapshot {
   stations: StationSnapshot[];
-  stats: {
+  /**
+   * Staff only. The public TV board connects to the same socket without a
+   * token and is sent the stations alone, so this is absent there — the day's
+   * takings are not for a screen the whole shop can see.
+   */
+  stats?: {
     activeNow: number;
     expiringSoon: number;
     sessionsToday: number;

@@ -10,6 +10,9 @@ import { asyncHandler, HttpError } from "../utils/asyncHandler";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
+// The catalogue and its prices are business data, not a public menu — GET was
+// reachable without a token until now. Mutations keep their own ADMIN checks.
+router.use(requireAuth);
 
 const uploadsDir = path.join(process.cwd(), "uploads", "products");
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -61,7 +64,6 @@ const createProductSchema = z.object({
 
 router.post(
   "/",
-  requireAuth,
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = createProductSchema.parse(req.body);
@@ -81,7 +83,6 @@ const updateProductSchema = createProductSchema.partial().extend({ active: z.boo
 
 router.patch(
   "/:id",
-  requireAuth,
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = updateProductSchema.parse(req.body);
@@ -113,7 +114,6 @@ router.patch(
 
 router.delete(
   "/:id",
-  requireAuth,
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     await prisma.product.update({ where: { id: req.params.id }, data: { active: false } });
@@ -124,7 +124,6 @@ router.delete(
 // Image optimizer: resize + compress on upload, save as webp, store relative URL on the product.
 router.post(
   "/:id/image",
-  requireAuth,
   requireRole("ADMIN"),
   upload.single("image"),
   asyncHandler(async (req, res) => {

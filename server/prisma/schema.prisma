@@ -51,6 +51,10 @@ model Staff {
   passwordHash String
   role         StaffRole @default(CASHIER)
   active       Boolean   @default(true)
+  /// Tokens issued before this moment are refused. Changing a password — or an
+  /// admin resetting one — therefore signs that account out everywhere, which a
+  /// stateless JWT cannot otherwise express.
+  passwordChangedAt DateTime @default(now())
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

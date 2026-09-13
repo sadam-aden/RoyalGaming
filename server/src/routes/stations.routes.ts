@@ -8,6 +8,11 @@ import { buildSnapshot } from "../services/sessionEngine";
 
 const router = Router();
 
+// Every station route needs a signed-in user. The public TV board takes its
+// data from the socket, which sends it a stripped snapshot — there is no
+// public REST surface here to keep.
+router.use(requireAuth);
+
 router.get(
   "/",
   asyncHandler(async (_req, res) => {
@@ -34,7 +39,6 @@ const createStationSchema = z.object({
 
 router.post(
   "/",
-  requireAuth,
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = createStationSchema.parse(req.body);
@@ -47,7 +51,6 @@ const updateStationSchema = createStationSchema.partial().extend({ active: z.boo
 
 router.patch(
   "/:id",
-  requireAuth,
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = updateStationSchema.parse(req.body);
@@ -58,7 +61,6 @@ router.patch(
 
 router.delete(
   "/:id",
-  requireAuth,
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const existing = await prisma.station.findUnique({ where: { id: req.params.id } });
