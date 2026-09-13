@@ -36,9 +36,22 @@ router.get(
     const categories = await prisma.productCategory.findMany({
       where: { locationId: DEFAULT_LOCATION_ID, ...(includeInactive ? {} : { active: true }) },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      include: { _count: { select: { products: true } } },
+      include: {
+        // Two counts, because deleting a product only hides it. `productCount`
+        // is what the admin can actually see in the catalogue; `hiddenCount`
+        // is the rest, which still hold the category down and would otherwise
+        // make it refuse deletion for no visible reason.
+        _count: { select: { products: { where: { active: true } } } },
+        products: { where: { active: false }, select: { id: true } },
+      },
     });
-    res.json(categories.map(({ _count, ...c }) => ({ ...c, productCount: _count.products })));
+    res.json(
+      categories.map(({ _count, products, ...c }) => ({
+        ...c,
+        productCount: _count.products,
+        hiddenCount: products.length,
+      }))
+    );
   })
 );
 
@@ -68,7 +81,7 @@ router.post(
           active: data.active ?? true,
         },
       });
-      res.status(201).json({ ...category, productCount: 0 });
+      res.status(201).json({ ...category, productCount: 0, hiddenCount: 0 });
     } catch (err) {
       throw asDuplicateNameError(err, data.name);
     }
@@ -90,10 +103,13 @@ router.patch(
       const category = await prisma.productCategory.update({
         where: { id: existing.id },
         data,
-        include: { _count: { select: { products: true } } },
+        include: {
+          _count: { select: { products: { where: { active: true } } } },
+          products: { where: { active: false }, select: { id: true } },
+        },
       });
-      const { _count, ...rest } = category;
-      res.json({ ...rest, productCount: _count.products });
+      const { _count, products, ...rest } = category;
+      res.json({ ...rest, productCount: _count.products, hiddenCount: products.length });
     } catch (err) {
       throw asDuplicateNameError(err, data.name ?? existing.name);
     }
@@ -107,20 +123,31 @@ router.delete(
   asyncHandler(async (req, res) => {
     const category = await prisma.productCategory.findFirst({
       where: { id: req.params.id, locationId: DEFAULT_LOCATION_ID },
-      include: { _count: { select: { products: true } } },
+      include: { products: { select: { id: true, active: true } } },
     });
     if (!category) throw new HttpError(404, "Category not found");
+
+    const live = category.products.filter((p) => p.active).length;
+    const hidden = category.products.length - live;
 
     // Refused rather than cascaded. Products point at a category, and every
     // past order line reaches its category through its product — deleting one
     // that is still in use would rewrite history in the reports. Switching it
     // off hides it from the POS and keeps the record intact, which is what is
     // almost always meant by "remove this category".
-    if (category._count.products > 0) {
+    if (category.products.length > 0) {
+      // Hidden products get named explicitly. Deleting a product only hides it,
+      // so a category can look empty in the catalogue and still be held down by
+      // one — and a refusal that does not say so reads as a bug.
+      const parts: string[] = [];
+      if (live > 0) parts.push(`${live} product${live === 1 ? "" : "s"}`);
+      if (hidden > 0) parts.push(`${hidden} deleted product${hidden === 1 ? "" : "s"} kept for past orders`);
       throw new HttpError(
         409,
-        `"${category.name}" still has ${category._count.products} product${category._count.products === 1 ? "" : "s"}. ` +
-          `Move them to another category first, or switch this one off to hide it from the POS.`
+        `"${category.name}" still has ${parts.join(" and ")}. ` +
+          (live > 0
+            ? "Move them to another category first, or switch this one off to hide it from the POS."
+            : "Switch it off instead to hide it from the POS.")
       );
     }
 

@@ -64,8 +64,10 @@ export interface ProductCategory {
   color: string;
   sortOrder: number;
   active: boolean;
-  /** How many products point at it — the admin screen needs this to allow deletion. */
+  /** Products in the catalogue, i.e. not deleted. */
   productCount?: number;
+  /** Deleted products still attached to it — invisible, but they block deletion. */
+  hiddenCount?: number;
 }
 
 export type ProductType = "ITEM" | "TIME_PACKAGE";

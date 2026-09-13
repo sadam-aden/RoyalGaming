@@ -7,6 +7,16 @@ import { CATEGORY_COLORS, categoriesApi } from "../../lib/categoriesApi";
 import type { ProductCategory } from "../../types";
 
 /**
+ * Anything still attached to a category, deleted products included.
+ *
+ * Deleting a product only hides it — the row stays so past orders still know
+ * what was sold — and a hidden row holds its category down just as firmly as a
+ * visible one. Counting only what is on screen would offer a delete the server
+ * is bound to refuse.
+ */
+const inUse = (c: ProductCategory) => (c.productCount ?? 0) + (c.hiddenCount ?? 0) > 0;
+
+/**
  * Add, rename, recolour, hide and delete product categories.
  *
  * Deleting is only offered for a category nothing points at. One with products
@@ -150,7 +160,14 @@ export function CategoryManager({
                       </div>
                     )}
                   </td>
-                  <td className="py-2.5 pr-4 text-text-muted">{c.productCount ?? 0}</td>
+                  <td className="py-2.5 pr-4 text-text-muted">
+                    {c.productCount ?? 0}
+                    {(c.hiddenCount ?? 0) > 0 && (
+                      <span className="ml-1.5 text-xs text-text-faint" title="Deleted products, kept so past orders still make sense">
+                        +{c.hiddenCount} deleted
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2.5 pr-4">
                     <button
                       onClick={() => run(() => categoriesApi.update(c.id, { active: !c.active }))}
@@ -167,10 +184,10 @@ export function CategoryManager({
                   <td className="py-2.5 text-right">
                     <button
                       onClick={() => handleDelete(c)}
-                      disabled={busy || (c.productCount ?? 0) > 0}
+                      disabled={busy || inUse(c)}
                       className="text-text-faint transition-colors hover:text-danger disabled:cursor-not-allowed disabled:opacity-30"
                       title={
-                        (c.productCount ?? 0) > 0
+                        inUse(c)
                           ? "Move or remove its products first, or hide it instead"
                           : "Delete category"
                       }

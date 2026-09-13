@@ -29,6 +29,7 @@ export function ProductsAdminPage() {
   const [priceDraft, setPriceDraft] = useState("");
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [stockDraft, setStockDraft] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
   function refresh() {
     setLoading(true);
@@ -71,6 +72,16 @@ export function ProductsAdminPage() {
     // Update in place rather than refetching — the list is sorted alphabetically,
     // so a full refresh would immediately move the renamed row out from under the admin.
     setProducts((prev) => prev.map((p) => (p.id === id ? updated.data : p)));
+  }
+
+  async function commitCategory(id: string, categoryId: string) {
+    setEditingCategoryId(null);
+    const product = products.find((p) => p.id === id);
+    if (!categoryId || categoryId === product?.categoryId) return;
+    await productsAdminApi.update(id, { categoryId });
+    // A full refresh rather than an in-place swap: moving a product changes the
+    // product counts on both categories, and those are on screen right above.
+    refresh();
   }
 
   function startEditPrice(p: Product) {
@@ -183,13 +194,43 @@ export function ProductsAdminPage() {
                         )}
                       </td>
                       <td className="py-3 pr-4 text-text-muted">
-                        <span className="inline-flex items-center gap-2">
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: p.category.color }}
-                          />
-                          {p.category.name}
-                        </span>
+                        {editingCategoryId === p.id ? (
+                          <select
+                            autoFocus
+                            defaultValue={p.categoryId}
+                            onChange={(e) => commitCategory(p.id, e.target.value)}
+                            onBlur={() => setEditingCategoryId(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") setEditingCategoryId(null);
+                            }}
+                            className="rounded-lg border border-accent bg-surface-alt px-2 py-1 text-sm text-text outline-none"
+                          >
+                            {/* The product's own category stays listed even if it
+                                has been switched off, so opening the dropdown
+                                cannot silently reassign it. */}
+                            {categories
+                              .filter((c) => c.active || c.id === p.categoryId)
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                  {c.active ? "" : " (hidden)"}
+                                </option>
+                              ))}
+                          </select>
+                        ) : (
+                          <button
+                            onClick={() => setEditingCategoryId(p.id)}
+                            className="group inline-flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-surface-alt hover:text-text"
+                            title="Click to move to another category"
+                          >
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ backgroundColor: p.category.color }}
+                            />
+                            {p.category.name}
+                            <Pencil size={12} className="text-text-faint opacity-0 group-hover:opacity-100" />
+                          </button>
+                        )}
                       </td>
                       <td className="py-3 pr-4 text-text-muted">
                         {editingPriceId === p.id ? (
