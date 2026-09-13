@@ -1,35 +1,52 @@
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { CategoryRevenue } from "../../lib/analyticsApi";
-import { CHART_AXIS, CHART_COLORS, CHART_GRID } from "../../lib/chartTheme";
 import { formatCurrency } from "../../lib/format";
 import { ChartTooltip } from "./ChartTooltip";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  PLAYSTATION: "PlayStation",
-  TABLE_GAMES: "Table Games",
-  SKATING: "Skating",
-  COFFEE: "Coffee",
-  CAFETERIA: "Cafeteria",
-};
-
+/**
+ * Revenue split by category.
+ *
+ * A pie rather than a bar: with five fixed categories the useful question is
+ * what share each one takes of the whole, which is what a pie shows directly
+ * and a bar only implies.
+ *
+ * Colours come from the same helper the Sales Report uses, so a category is the
+ * same colour on both pages — Cafeteria is pink here and pink there.
+ */
 export function RevenueByCategoryChart({ data }: { data: CategoryRevenue[] }) {
   if (data.length === 0) {
     return <div className="flex h-70 items-center justify-center text-sm text-text-faint">No data for this period</div>;
   }
 
   const chartData = data
-    .map((d) => ({ ...d, label: CATEGORY_LABELS[d.category] ?? d.category }))
+    .filter((d) => d.revenue > 0)
+    .map((d) => ({
+      ...d,
+      label: d.name,
+      color: d.color,
+    }))
     .sort((a, b) => b.revenue - a.revenue);
+
+  if (chartData.length === 0) {
+    return <div className="flex h-70 items-center justify-center text-sm text-text-faint">No data for this period</div>;
+  }
 
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-        <CartesianGrid stroke={CHART_GRID} vertical={false} />
-        <XAxis dataKey="label" stroke={CHART_AXIS} tick={{ fill: CHART_AXIS, fontSize: 12 }} axisLine={{ stroke: CHART_GRID }} tickLine={false} />
-        <YAxis stroke={CHART_AXIS} tick={{ fill: CHART_AXIS, fontSize: 12 }} axisLine={false} tickLine={false} width={56} />
-        <Tooltip content={<ChartTooltip formatter={(v) => formatCurrency(v)} />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-        <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} maxBarSize={56} />
-      </BarChart>
+      <PieChart>
+        <Pie data={chartData} dataKey="revenue" nameKey="label" innerRadius={60} outerRadius={95} paddingAngle={2} stroke="none">
+          {chartData.map((d) => (
+            <Cell key={d.category} fill={d.color} />
+          ))}
+        </Pie>
+        <Tooltip content={<ChartTooltip formatter={(v) => formatCurrency(v)} />} />
+        <Legend
+          verticalAlign="bottom"
+          iconType="circle"
+          iconSize={8}
+          formatter={(value) => <span className="text-xs text-text-muted">{value}</span>}
+        />
+      </PieChart>
     </ResponsiveContainer>
   );
 }

@@ -12,8 +12,12 @@ export interface RevenuePoint {
 }
 
 export interface CategoryRevenue {
+  /** Category id. */
   category: string;
+  name: string;
+  color: string;
   revenue: number;
+  quantity: number;
 }
 
 export interface ProductRevenue {
@@ -22,15 +26,26 @@ export interface ProductRevenue {
   quantity: number;
 }
 
-export interface PaymentMethodAmount {
-  method: string;
-  amount: number;
+export interface RecentOrderItem {
+  name: string;
+  quantity: number;
+  lineTotal: number;
 }
 
-export interface OrdersTrendPoint {
-  date: string;
-  orders: number;
-  items: number;
+export interface RecentOrder {
+  id: string;
+  orderNumber: number;
+  createdAt: string;
+  total: number;
+  paymentMethod: string | null;
+  items: RecentOrderItem[];
+}
+
+export interface RecentOrders {
+  orders: RecentOrder[];
+  /** Across the whole range, not just the receipts listed. */
+  totalOrders: number;
+  totalItems: number;
 }
 
 export interface DateRange {
@@ -45,7 +60,6 @@ export const analyticsApi = {
     api.get<CategoryRevenue[]>("/analytics/revenue-by-category", { params: range }),
   revenueByProduct: (range: DateRange) =>
     api.get<ProductRevenue[]>("/analytics/revenue-by-product", { params: range }),
-  paymentMethods: (range: DateRange) =>
-    api.get<PaymentMethodAmount[]>("/analytics/payment-methods", { params: range }),
-  ordersTrend: (range: DateRange) => api.get<OrdersTrendPoint[]>("/analytics/orders-trend", { params: range }),
+  recentOrders: (range: DateRange, limit = 10) =>
+    api.get<RecentOrders>("/analytics/recent-orders", { params: { ...range, limit } }),
 };

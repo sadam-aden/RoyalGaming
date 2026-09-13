@@ -1,9 +1,17 @@
 import { useState } from "react";
 import type { DateRange } from "../../lib/analyticsApi";
+import { toDayKey } from "../../lib/period";
 
 type Preset = "today" | "week" | "month" | "custom";
 
-const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+/**
+ * The user's calendar day, not UTC's.
+ *
+ * This used to be `toISOString().slice(0, 10)`, which converts to UTC first.
+ * Anywhere east of UTC that reports yesterday's date for the first hours of
+ * every day — so "Today" opened on yesterday's takings until mid-morning.
+ */
+const toISODate = (d: Date) => toDayKey(d);
 
 function presetRange(preset: Preset): DateRange {
   const now = new Date();

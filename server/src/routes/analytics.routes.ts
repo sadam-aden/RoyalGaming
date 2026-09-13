@@ -1,35 +1,42 @@
 import { Router } from "express";
 import { OrderStatus, PaymentMethod } from "@prisma/client";
 import { DEFAULT_LOCATION_ID, prisma } from "../lib/prisma";
-import { asyncHandler, HttpError } from "../utils/asyncHandler";
+import { asyncHandler } from "../utils/asyncHandler";
 import { requireAuth } from "../middleware/auth";
 import { round2 } from "../utils/pricing";
 import { qualifiedProductLabel } from "../utils/productLabel";
+import { dayKey, eachDayKey, resolveRange, type ResolvedRange } from "../utils/dateRange";
 
 const router = Router();
 router.use(requireAuth);
 
-function parseRange(req: { query: Record<string, unknown> }) {
-  const from = typeof req.query.from === "string" ? new Date(req.query.from) : null;
-  const to = typeof req.query.to === "string" ? new Date(req.query.to) : null;
-  if (!from || !to || Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    throw new HttpError(400, "Query params 'from' and 'to' (ISO dates) are required");
-  }
-  // make 'to' inclusive of the whole day if only a date (no time) was given
-  const inclusiveTo = new Date(to);
-  if (req.query.to && (req.query.to as string).length <= 10) inclusiveTo.setHours(23, 59, 59, 999);
-  return { from, to: inclusiveTo };
-}
+/**
+ * Dates come from the shared resolver, the same one the sales report uses.
+ *
+ * This used to parse `from`/`to` with `new Date()` — which reads a bare
+ * YYYY-MM-DD as UTC midnight — and then push `to` to the end of the day with
+ * `setHours(23, 59, 59, 999)`, which is *local*. Meanwhile the day buckets
+ * below were keyed off `toISOString()`, UTC again. Three different notions of
+ * when a day starts, in one file. On a server away from UTC that put orders in
+ * buckets outside the range that fetched them.
+ */
+const rangeOf = (req: { query: Record<string, unknown> }): ResolvedRange => resolveRange(req.query);
 
-async function completedOrdersInRange(from: Date, to: Date) {
+function completedOrdersIn(range: { gte: Date; lt: Date }) {
   return prisma.order.findMany({
-    where: { locationId: DEFAULT_LOCATION_ID, status: OrderStatus.COMPLETED, createdAt: { gte: from, lte: to } },
-    include: { items: { include: { product: true } } },
+    where: completedWhere(range),
+    include: { items: { include: { product: { include: { category: true } } } } },
   });
 }
 
-async function kpiSummary(from: Date, to: Date) {
-  const orders = await completedOrdersInRange(from, to);
+const completedWhere = (range: { gte: Date; lt: Date }) => ({
+  locationId: DEFAULT_LOCATION_ID,
+  status: OrderStatus.COMPLETED,
+  createdAt: { gte: range.gte, lt: range.lt },
+});
+
+async function kpiSummary(range: { gte: Date; lt: Date }) {
+  const orders = await completedOrdersIn(range);
   const cashRevenue = round2(
     orders.filter((o) => o.paymentMethod !== PaymentMethod.CREDIT).reduce((s, o) => s + Number(o.total), 0)
   );
@@ -39,7 +46,7 @@ async function kpiSummary(from: Date, to: Date) {
   const expenses = round2(
     (
       await prisma.expense.aggregate({
-        where: { locationId: DEFAULT_LOCATION_ID, date: { gte: from, lte: to } },
+        where: { locationId: DEFAULT_LOCATION_ID, date: { gte: range.gte, lt: range.lt } },
         _sum: { amount: true },
       })
     )._sum.amount?.toNumber() ?? 0
@@ -56,13 +63,13 @@ const pctChange = (current: number, previous: number) => {
 router.get(
   "/summary",
   asyncHandler(async (req, res) => {
-    const { from, to } = parseRange(req);
-    const current = await kpiSummary(from, to);
+    const range = rangeOf(req);
+    const current = await kpiSummary(range);
 
-    const rangeMs = to.getTime() - from.getTime();
-    const prevTo = new Date(from.getTime() - 1);
-    const prevFrom = new Date(prevTo.getTime() - rangeMs);
-    const previous = await kpiSummary(prevFrom, prevTo);
+    // The equally-long window ending where this one begins. Half-open ranges
+    // make that exact: the previous period runs up to, but not into, `gte`.
+    const span = range.gte.getTime() - range.lt.getTime();
+    const previous = await kpiSummary({ gte: new Date(range.gte.getTime() + span), lt: range.gte });
 
     res.json({
       current,
@@ -80,41 +87,45 @@ router.get(
 router.get(
   "/revenue-trend",
   asyncHandler(async (req, res) => {
-    const { from, to } = parseRange(req);
-    const orders = await completedOrdersInRange(from, to);
+    const range = rangeOf(req);
+    const orders = await completedOrdersIn(range);
     const byDay = new Map<string, number>();
     for (const o of orders) {
-      const key = o.createdAt.toISOString().slice(0, 10);
+      const key = dayKey(o.createdAt, range.timeZone);
       byDay.set(key, round2((byDay.get(key) ?? 0) + Number(o.total)));
     }
-    const days = [...byDay.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, revenue]) => ({ date, revenue }));
-    res.json(days);
+    // Zero-filled: a day with no sales is a point at zero, not a gap the line
+    // is drawn straight through as though the days either side were adjacent.
+    res.json(eachDayKey(range.fromKey, range.toKey).map((date) => ({ date, revenue: byDay.get(date) ?? 0 })));
   })
 );
 
 router.get(
   "/revenue-by-category",
   asyncHandler(async (req, res) => {
-    const { from, to } = parseRange(req);
-    const orders = await completedOrdersInRange(from, to);
-    const byCategory = new Map<string, number>();
+    const range = rangeOf(req);
+    const orders = await completedOrdersIn(range);
+    // Keyed by id, not by name: a category renamed mid-period is still one
+    // category, and two categories may not share a name anyway.
+    const byCategory = new Map<string, { category: string; name: string; color: string; revenue: number; quantity: number }>();
     for (const o of orders) {
       for (const item of o.items) {
-        const key = item.product.category;
-        byCategory.set(key, round2((byCategory.get(key) ?? 0) + Number(item.lineTotal)));
+        const { id, name, color } = item.product.category;
+        const acc = byCategory.get(id) ?? { category: id, name, color, revenue: 0, quantity: 0 };
+        acc.revenue = round2(acc.revenue + Number(item.lineTotal));
+        acc.quantity += item.quantity;
+        byCategory.set(id, acc);
       }
     }
-    res.json([...byCategory.entries()].map(([category, revenue]) => ({ category, revenue })));
+    res.json([...byCategory.values()].sort((a, b) => b.revenue - a.revenue));
   })
 );
 
 router.get(
   "/revenue-by-product",
   asyncHandler(async (req, res) => {
-    const { from, to } = parseRange(req);
-    const orders = await completedOrdersInRange(from, to);
+    const range = rangeOf(req);
+    const orders = await completedOrdersIn(range);
     const byProduct = new Map<string, { name: string; revenue: number; quantity: number }>();
     for (const o of orders) {
       for (const item of o.items) {
@@ -129,37 +140,45 @@ router.get(
   })
 );
 
+/** Most recent receipts in the range, with what was on them. */
 router.get(
-  "/payment-methods",
+  "/recent-orders",
   asyncHandler(async (req, res) => {
-    const { from, to } = parseRange(req);
-    const orders = await completedOrdersInRange(from, to);
-    const byMethod = new Map<string, number>();
-    for (const o of orders) {
-      const key = o.paymentMethod ?? "UNKNOWN";
-      byMethod.set(key, round2((byMethod.get(key) ?? 0) + Number(o.total)));
-    }
-    res.json([...byMethod.entries()].map(([method, amount]) => ({ method, amount })));
-  })
-);
+    const range = rangeOf(req);
+    const requested = Number(req.query.limit ?? 10);
+    const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 50) : 10;
+    const where = completedWhere(range);
 
-router.get(
-  "/orders-trend",
-  asyncHandler(async (req, res) => {
-    const { from, to } = parseRange(req);
-    const orders = await completedOrdersInRange(from, to);
-    const byDay = new Map<string, { orders: number; items: number }>();
-    for (const o of orders) {
-      const key = o.createdAt.toISOString().slice(0, 10);
-      const existing = byDay.get(key) ?? { orders: 0, items: 0 };
-      existing.orders += 1;
-      existing.items += o.items.reduce((s, i) => s + i.quantity, 0);
-      byDay.set(key, existing);
-    }
-    const days = [...byDay.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date, ...v }));
-    res.json(days);
+    // The list is `take`-limited rather than filtered in memory, and the two
+    // totals are counted in the database, so a busy month does not have to be
+    // loaded in full just to show the last ten receipts.
+    const [recent, totalOrders, itemsAgg] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: { items: { include: { product: { include: { category: true } } } } },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      }),
+      prisma.order.count({ where }),
+      prisma.orderItem.aggregate({ where: { order: where }, _sum: { quantity: true } }),
+    ]);
+
+    res.json({
+      orders: recent.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        createdAt: o.createdAt,
+        total: Number(o.total),
+        paymentMethod: o.paymentMethod,
+        items: o.items.map((i) => ({
+          name: qualifiedProductLabel(i.product),
+          quantity: i.quantity,
+          lineTotal: Number(i.lineTotal),
+        })),
+      })),
+      totalOrders,
+      totalItems: itemsAgg._sum.quantity ?? 0,
+    });
   })
 );
 
