@@ -4,7 +4,7 @@ import { Router } from "express";
 import multer from "multer";
 import sharp from "sharp";
 import { z } from "zod";
-import { ProductCategory, ProductType, StationType } from "@prisma/client";
+import { ProductType, StationType } from "@prisma/client";
 import { DEFAULT_LOCATION_ID, prisma } from "../lib/prisma";
 import { asyncHandler, HttpError } from "../utils/asyncHandler";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -29,13 +29,16 @@ const upload = multer({
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    const category = typeof req.query.category === "string" ? req.query.category : undefined;
+const categoryId = typeof req.query.categoryId === "string" ? req.query.categoryId : undefined;
     const products = await prisma.product.findMany({
       where: {
         locationId: DEFAULT_LOCATION_ID,
         active: true,
-        ...(category ? { category: category as ProductCategory } : {}),
+        ...(categoryId ? { categoryId } : {}),
       },
+      // The category travels with the product so the POS can filter, label and
+      // colour from one response.
+      include: { category: true },
       orderBy: { name: "asc" },
     });
     res.json(products);
@@ -44,7 +47,7 @@ router.get(
 
 const createProductSchema = z.object({
   name: z.string().min(1),
-  category: z.nativeEnum(ProductCategory),
+  categoryId: z.string().uuid(),
   type: z.nativeEnum(ProductType).default(ProductType.ITEM),
   price: z.number().nonnegative(),
   durationMin: z.number().int().positive().optional(),
@@ -65,8 +68,10 @@ router.post(
     const isItem = data.type === ProductType.ITEM;
     const stockQty = isItem ? data.stockQty ?? 0 : null;
     const inStock = isItem ? stockQty! > 0 : data.inStock ?? true;
+    await assertCategoryExists(data.categoryId);
     const product = await prisma.product.create({
       data: { ...data, stockQty, inStock, locationId: DEFAULT_LOCATION_ID },
+      include: { category: true },
     });
     res.status(201).json(product);
   })
@@ -96,7 +101,12 @@ router.patch(
       updateData.stockQty = null;
     }
 
-    const product = await prisma.product.update({ where: { id: req.params.id }, data: updateData });
+    if (data.categoryId) await assertCategoryExists(data.categoryId);
+    const product = await prisma.product.update({
+      where: { id: req.params.id },
+      data: updateData,
+      include: { category: true },
+    });
     res.json(product);
   })
 );
@@ -131,9 +141,27 @@ router.post(
       .toFile(outputPath);
 
     const imageUrl = `/uploads/products/${filename}`;
-    const updated = await prisma.product.update({ where: { id: product.id }, data: { imageUrl } });
+    const updated = await prisma.product.update({
+      where: { id: product.id },
+      data: { imageUrl },
+      include: { category: true },
+    });
     res.json(updated);
   })
 );
+
+/**
+ * A product may only point at a category of this location.
+ *
+ * Without this the foreign key would still catch it, but as an opaque 500
+ * rather than a 400 naming the problem.
+ */
+async function assertCategoryExists(categoryId: string) {
+  const category = await prisma.productCategory.findFirst({
+    where: { id: categoryId, locationId: DEFAULT_LOCATION_ID },
+    select: { id: true },
+  });
+  if (!category) throw new HttpError(400, "That category does not exist");
+}
 
 export default router;

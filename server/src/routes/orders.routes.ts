@@ -23,7 +23,7 @@ async function decrementStock(tx: Prisma.TransactionClient, items: { productId: 
 }
 
 const orderInclude = {
-  items: { include: { product: true } },
+  items: { include: { product: { include: { category: true } } } },
   customer: true,
   waiter: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },

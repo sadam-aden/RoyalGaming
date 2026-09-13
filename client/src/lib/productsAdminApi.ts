@@ -1,9 +1,9 @@
 import { api } from "./api";
-import type { Product, ProductCategory, ProductType, StationType } from "../types";
+import type { Product, ProductType, StationType } from "../types";
 
 export interface ProductPayload {
   name: string;
-  category: ProductCategory;
+  categoryId: string;
   type: ProductType;
   price: number;
   durationMin?: number;

@@ -23,6 +23,7 @@ model Location {
 
   stations       Station[]
   products       Product[]
+  productCategories ProductCategory[]
   orders         Order[]
   customers      Customer[]
   discounts      Discount[]
@@ -151,12 +152,27 @@ model Session {
 // Products / Categories
 // ─────────────────────────────────────────────────────────────
 
-enum ProductCategory {
-  PLAYSTATION
-  TABLE_GAMES
-  SKATING
-  COFFEE
-  CAFETERIA
+/// Product categories are rows, not an enum, so the shop can add, rename and
+/// retire its own (a new console, a new counter) without a code change.
+/// Deleting one that still has products is refused — the products, and every
+/// past order line through them, would lose what they belong to.
+model ProductCategory {
+  id         String   @id @default(uuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  name       String
+  /// Hex swatch, so a category looks the same in every chart, bar and badge.
+  color      String   @default("#3987e5")
+  sortOrder  Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  products Product[]
+
+  @@unique([locationId, name])
+  @@index([locationId])
+  @@map("product_categories")
 }
 
 enum ProductType {
@@ -169,7 +185,8 @@ model Product {
   locationId  String
   location    Location        @relation(fields: [locationId], references: [id])
   name        String
-  category    ProductCategory
+  categoryId  String
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
   type        ProductType     @default(ITEM)
   price       Decimal         @db.Decimal(10, 2)
   imageUrl    String?
@@ -191,7 +208,7 @@ model Product {
   orderItems OrderItem[]
 
   @@index([locationId])
-  @@index([category])
+  @@index([categoryId])
   @@map("products")
 }
 

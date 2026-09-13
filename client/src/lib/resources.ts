@@ -2,7 +2,7 @@ import { api } from "./api";
 import type { Customer, Discount, Order, PaymentMethod, Product, StaffMember } from "../types";
 
 export const productsApi = {
-  list: (category?: string) => api.get<Product[]>("/products", { params: category ? { category } : undefined }),
+  list: (categoryId?: string) => api.get<Product[]>("/products", { params: categoryId ? { categoryId } : undefined }),
 };
 
 export const customersApi = {

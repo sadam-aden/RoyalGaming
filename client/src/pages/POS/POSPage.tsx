@@ -6,21 +6,16 @@ import { ProductCard } from "../../components/pos/ProductCard";
 import { CartPanel } from "../../components/pos/CartPanel";
 import { HeldOrdersDrawer } from "../../components/pos/HeldOrdersDrawer";
 import { productsApi } from "../../lib/resources";
+import { categoriesApi } from "../../lib/categoriesApi";
 import { useCartStore } from "../../store/cartStore";
 import type { Product, ProductCategory } from "../../types";
 
-const CATEGORIES: { value: ProductCategory | "ALL"; label: string }[] = [
-  { value: "ALL", label: "All Items" },
-  { value: "PLAYSTATION", label: "Play Station" },
-  { value: "TABLE_GAMES", label: "Table Games" },
-  { value: "SKATING", label: "Skating" },
-  { value: "COFFEE", label: "Coffee" },
-  { value: "CAFETERIA", label: "Cafeteria" },
-];
-
 export function POSPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [category, setCategory] = useState<ProductCategory | "ALL">("ALL");
+  // The filter bar is built from the categories the shop actually has, so one
+  // added on the Products page shows up here without a code change.
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [categoryId, setCategoryId] = useState<string | "ALL">("ALL");
   const [showHeld, setShowHeld] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
 
@@ -29,8 +24,11 @@ export function POSPage() {
   }
 
   useEffect(loadProducts, []);
+  useEffect(() => {
+    categoriesApi.list().then((r) => setCategories(r.data));
+  }, []);
 
-  const filtered = category === "ALL" ? products : products.filter((p) => p.category === category);
+  const filtered = categoryId === "ALL" ? products : products.filter((p) => p.categoryId === categoryId);
 
   function handleSelect(product: Product) {
     addItem(product.id, product.name, product.price);
@@ -51,15 +49,26 @@ export function POSPage() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex gap-2 overflow-x-auto border-b border-border px-6 py-3">
-            {CATEGORIES.map((c) => (
+            <button
+              onClick={() => setCategoryId("ALL")}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                categoryId === "ALL" ? "bg-accent text-white" : "bg-surface-alt text-text-muted hover:text-text"
+              }`}
+            >
+              All Items
+            </button>
+            {categories.map((c) => (
               <button
-                key={c.value}
-                onClick={() => setCategory(c.value)}
+                key={c.id}
+                onClick={() => setCategoryId(c.id)}
+                // The category's own colour when selected, so the bar reads the
+                // same way as the colours in the reports.
+                style={categoryId === c.id ? { backgroundColor: c.color } : undefined}
                 className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  category === c.value ? "bg-accent text-white" : "bg-surface-alt text-text-muted hover:text-text"
+                  categoryId === c.id ? "text-white" : "bg-surface-alt text-text-muted hover:text-text"
                 }`}
               >
-                {c.label}
+                {c.name}
               </button>
             ))}
           </div>

@@ -56,12 +56,24 @@ export interface SessionHistoryRow {
   finalAmount: number | null;
 }
 
-export type ProductCategory = "PLAYSTATION" | "TABLE_GAMES" | "SKATING" | "COFFEE" | "CAFETERIA";
+/** A category is a row the admin manages, not a fixed set of values. */
+export interface ProductCategory {
+  id: string;
+  name: string;
+  /** Hex, so the category looks the same in every chart, bar and badge. */
+  color: string;
+  sortOrder: number;
+  active: boolean;
+  /** How many products point at it — the admin screen needs this to allow deletion. */
+  productCount?: number;
+}
+
 export type ProductType = "ITEM" | "TIME_PACKAGE";
 
 export interface Product {
   id: string;
   name: string;
+  categoryId: string;
   category: ProductCategory;
   type: ProductType;
   price: number;

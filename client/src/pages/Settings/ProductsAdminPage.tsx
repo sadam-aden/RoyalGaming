@@ -9,13 +9,17 @@ import { apiErrorMessage } from "../../lib/api";
 import { formatCurrency } from "../../lib/format";
 import { resolveAssetUrl } from "../../lib/config";
 import { RemoteImage } from "../../components/ui/RemoteImage";
+import { CategoryManager } from "../../components/settings/CategoryManager";
+import { categoriesApi } from "../../lib/categoriesApi";
 import type { Product, ProductCategory, ProductType, StationType } from "../../types";
 
-const CATEGORIES: ProductCategory[] = ["PLAYSTATION", "TABLE_GAMES", "SKATING", "COFFEE", "CAFETERIA"];
 const STATION_TYPES: StationType[] = ["PLAYSTATION", "TABLE_GAME", "SKATING", "OTHER"];
 
 export function ProductsAdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  // Includes the switched-off ones: this is the screen where they get switched
+  // back on, so it has to be able to see them.
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -28,9 +32,11 @@ export function ProductsAdminPage() {
 
   function refresh() {
     setLoading(true);
-    productsAdminApi
-      .list()
-      .then((r) => setProducts(r.data))
+    Promise.all([productsAdminApi.list(), categoriesApi.list(true)])
+      .then(([p, c]) => {
+        setProducts(p.data);
+        setCategories(c.data);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -105,7 +111,9 @@ export function ProductsAdminPage() {
         }
       />
 
-      <div className="p-8">
+      <div className="flex flex-col gap-6 p-8">
+        <CategoryManager categories={categories} onChanged={refresh} />
+
         <Card>
           {loading ? (
             <p className="text-sm text-text-muted">Loading...</p>
@@ -174,7 +182,15 @@ export function ProductsAdminPage() {
                           </div>
                         )}
                       </td>
-                      <td className="py-3 pr-4 text-text-muted">{p.category.replace("_", " ")}</td>
+                      <td className="py-3 pr-4 text-text-muted">
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: p.category.color }}
+                          />
+                          {p.category.name}
+                        </span>
+                      </td>
                       <td className="py-3 pr-4 text-text-muted">
                         {editingPriceId === p.id ? (
                           <input
@@ -263,6 +279,7 @@ export function ProductsAdminPage() {
 
       {showNew && (
         <NewProductModal
+          categories={categories.filter((c) => c.active)}
           onClose={() => setShowNew(false)}
           onCreated={() => {
             setShowNew(false);
@@ -274,9 +291,17 @@ export function ProductsAdminPage() {
   );
 }
 
-function NewProductModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NewProductModal({
+  categories,
+  onClose,
+  onCreated,
+}: {
+  categories: ProductCategory[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<ProductCategory>("CAFETERIA");
+  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
   const [type, setType] = useState<ProductType>("ITEM");
   const [price, setPrice] = useState("");
   const [stockQty, setStockQty] = useState("0");
@@ -293,10 +318,14 @@ function NewProductModal({ onClose, onCreated }: { onClose: () => void; onCreate
       setError("Enter a name and a valid price");
       return;
     }
+    if (!categoryId) {
+      setError("Add a category first — every product belongs to one");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const payload: ProductPayload = { name: name.trim(), category, type, price: parsedPrice };
+      const payload: ProductPayload = { name: name.trim(), categoryId, type, price: parsedPrice };
       if (type === "TIME_PACKAGE") {
         payload.durationMin = Number(durationMin);
         payload.stationTypeLink = stationTypeLink;
@@ -329,13 +358,14 @@ function NewProductModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div>
             <label className="mb-1.5 block text-xs font-medium text-text-muted">Category</label>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as ProductCategory)}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
               className="w-full rounded-xl border border-border bg-surface-alt px-3 py-2 text-sm text-text outline-none"
             >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c.replace("_", " ")}
+              {categories.length === 0 && <option value="">No categories yet</option>}
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
