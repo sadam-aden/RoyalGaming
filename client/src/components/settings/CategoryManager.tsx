@@ -117,7 +117,9 @@ export function CategoryManager({
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border-soft text-xs uppercase tracking-wide text-text-faint">
-                <th className="pb-2 pr-4 font-medium">Colour</th>
+                {/* The swatch sits with the name rather than in a column of its
+                    own — a whole column for one dot costs a quarter of a phone
+                    screen, and it reads better beside the thing it colours. */}
                 <th className="pb-2 pr-4 font-medium">Name</th>
                 <th className="pb-2 pr-4 font-medium">Products</th>
                 <th className="pb-2 pr-4 font-medium">Shown in POS</th>
@@ -127,11 +129,10 @@ export function CategoryManager({
             <tbody>
               {categories.map((c) => (
                 <tr key={c.id} className="border-b border-border-soft/60 text-text">
-                  <td className="py-2.5 pr-4">
-                    <ColorPicker value={c.color} onChange={(color) => run(() => categoriesApi.update(c.id, { color }))} />
-                  </td>
                   <td className="py-2.5 pr-4 font-medium">
-                    {editingId === c.id ? (
+                    <div className="flex items-center gap-2.5">
+                      <ColorPicker value={c.color} onChange={(color) => run(() => categoriesApi.update(c.id, { color }))} />
+                      {editingId === c.id ? (
                       <input
                         autoFocus
                         value={draftName}
@@ -142,23 +143,22 @@ export function CategoryManager({
                           if (e.key === "Escape") setEditingId(null);
                         }}
                         maxLength={40}
-                        className="w-44 rounded-lg border border-accent bg-surface-alt px-2 py-1 text-sm text-text outline-none"
+                        className="w-36 rounded-lg border border-accent bg-surface-alt px-2 py-1 text-sm text-text outline-none sm:w-44"
                       />
-                    ) : (
-                      <div className="group flex items-center gap-1.5">
-                        <span>{c.name}</span>
+                      ) : (
                         <button
                           onClick={() => {
                             setEditingId(c.id);
                             setDraftName(c.name);
                           }}
-                          className="text-text-faint opacity-0 hover:text-accent group-hover:opacity-100"
+                          className="group flex items-center gap-1.5 text-left"
                           title="Rename"
                         >
-                          <Pencil size={12} />
+                          <span>{c.name}</span>
+                          <Pencil size={12} className="shrink-0 text-text-faint opacity-0 group-hover:opacity-100" />
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </td>
                   <td className="py-2.5 pr-4 text-text-muted">
                     {c.productCount ?? 0}

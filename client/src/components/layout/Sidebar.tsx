@@ -16,9 +16,10 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
+import { useUiStore } from "../../store/uiStore";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
 const navItem =
@@ -26,8 +27,14 @@ const navItem =
 const navItemActive = "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent";
 
 function Item({ to, icon: Icon, label }: { to: string; icon: typeof LayoutGrid; label: string }) {
+  const closeSidebar = useUiStore((s) => s.closeSidebar);
   return (
-    <NavLink to={to} end className={({ isActive }) => clsx(navItem, isActive && navItemActive)}>
+    <NavLink
+      to={to}
+      end
+      onClick={closeSidebar}
+      className={({ isActive }) => clsx(navItem, isActive && navItemActive)}
+    >
       <Icon size={18} />
       {label}
     </NavLink>
@@ -38,9 +45,35 @@ export function Sidebar() {
   const { user, logout } = useAuthStore();
   const isAdmin = user?.role === "ADMIN";
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const { sidebarOpen, closeSidebar } = useUiStore();
+  const { pathname } = useLocation();
+
+  // Navigating any other way — a redirect, the back button — should not leave
+  // the drawer sitting open over the page it moved to.
+  useEffect(closeSidebar, [pathname, closeSidebar]);
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-surface px-4 py-6">
+    <>
+      {/* Below lg the sidebar is a drawer over the page, so it needs something
+          to dismiss it. Above lg it is part of the layout and this never
+          renders. */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={closeSidebar}
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+        />
+      )}
+
+      <aside
+        className={clsx(
+          "flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-4 py-6",
+          // Drawer on small screens, ordinary column from lg up.
+          "fixed inset-y-0 left-0 z-50 transition-transform duration-200 lg:static lg:z-auto lg:h-full lg:translate-x-0 lg:transition-none",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
       <div className="mb-8 flex items-center gap-2 px-2">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-white">
           <Gamepad2 size={20} />
@@ -111,7 +144,8 @@ export function Sidebar() {
         </button>
       </div>
 
-      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
-    </aside>
+        {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      </aside>
+    </>
   );
 }
